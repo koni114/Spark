@@ -136,7 +136,227 @@ val myRange = spark.range(1000).toDF("number")
 - 만약 파티션이 하나고, 수천개의 익스큐터가 있더라도 병렬성은 1
 - 수백개의 파티션이 있고 익스큐터가 하나밖에 없다면 병렬성은 1
 - DataFrame을 사용하면 파티션을 수동 또는 개별적으로 처리할 필요가 없음  
-  물리적 파티션에 데이터 변환용 함수를 지정하면 스파크가 실제 처리 방법을 결정  
+  <b>물리적 파티션에 데이터 변환용 함수</b>를 지정하면 스파크가 실제 처리 방법을 결정  
+
+### 2.6.2 트렌스포메이션
+- Spark의 핵심 데이터 구조는 불변성(immutable)을 가짐  
+  즉 한번 생성하면 변경할 수 없음
+- DataFrame을 변경하려면 원하는 변경 방법을 Spark에 알려줘야 하는데,  
+  이때 사용하는 명령을 <b>트렌스포메이션</b> 이라고 함
+- 다음 코드는 DataFrame에서 짝수를 찾는 예제
+~~~
+val myRange  = spark.range(1000).toDF("number")
+val divisBy2 = myRange.where("number % 2 = 0")
+~~~
+- 위 코드를 실행해도 결과는 출력되지 않음  
+  (응답값은 출력되지만 데이터를 처리한 결과는 아님)
+- 추상적인 트렌스포메이션만 지정한 상태이기 때문에 액션(action)을 호출하지 않으면  
+  Spark는 실제 트렌스포메이션을 수행하지 않음
+- 트렌스포메이션은 Spark에서 비즈니스 로직을 표현하는 핵심 개념  
+- 트렌스포메이션에는 <b>좁은 의존성(narrow dependency)</b> 과  <b>넓은 의존성(wide dependency)</b> 두 가지 유형이 있음
+
+#### 좁은 의존성(narrow dependency)
+- 좁은 의존성을 가진 트렌스포메이션은 각 입력 파티션이 하나의 출력 파티션에만 영향을 미침  
+  (입력 파티션과 출력 파티션이 1:1 대응)
+- 이전 코드에서 where 구문은 좁은 의존성을 가짐
+- Spark에서 <b>파이프라이닝(pipelining)</b>을 자동으로 수행함  
+  즉, DataFrame에서 여러 필터를 지정하는 경우 모든 작업이 메모리에서 일어남
+~~~
+      좁은 의존성 트렌스포메이션
+
+ 입력 파티션1 -------> 출력 파티션1
+
+ 입력 파티션2 -------> 출력 파티션2
+
+ 입력 파티션3 -------> 출력 파티션3
+~~~
+
+
+#### 넓은 의존성(wide dependency)
+- 하나의 입력 파티션이 여러 출력 파티션에 영향을 미침
+~~~
+      넓은 의존성 프렌스포메이션
+
+  입력 파티션1 ---------> 출력 파티션1
+               \
+                \_ _ _ _> 출력 파티션2 
+                ...
+~~~
+
+### 2.7.1 지연 연산(lazy evaluation)
+- 지연 연산(lazy evaluation)은 스파크가 연산 그래프를 처리하기 직전까지 기다리는 동작 방식
+- Spark은 특정 연산 명령이 내려진 즉시 데이터를 수정하지 않고, 원시 데이터에 적용할  
+  트랜스포메이션의 <b>실행 계획</b>을 생성
+- Spark은 코드를 실행하는 마지막 순간까지 대기하다가 원형 DataFrame 트렌스포메이션을 간결한  
+ 물리적 실행 계획으로 컴파일함
+- Spark은 이 과정을 거치며 전체 데이터 흐름을 최적화 하는 엄청난 강점을 가지고 있음
+- ex) 조건절 푸시다운(predicate pushdown)  
+  아주 복잡한 Spark job이 하나의 로우만 가져오는 필터를 가지고 있다면,  
+  필요한 레코드 하나만 읽는 것이 가장 효율적  
+  Spark은 이 필터를 데이터소스로 위임하는 최적화 작업을 자동으로 수행  
+  (만약 데이터 저장소가 DB라면 WHERE절의 처리를 위임함으로써 처리에 필요 자원을 최소화 할 수 있음)
+
+### 2.8 액션(action)
+- 사용자는 트렌스포메이션을 사용해 논리적 실행 계획을 세울 수 있는데, 실제 연산을 수행하려면  
+ 액션 명령을 내려야 함
+- 가장 단순한 액션인 count 메소드는 DataFrame의 전체 레코드 수를 반환
+~~~
+divisBy2.count()
+~~~
+- count 외에도 3가지 액션이 존재
+  - 콘솔에서 데이터를 보는 액션
+  - 각 언어로 된 네이티브 객체에 데이터를 모으는 액션
+  - 출력 데이터소스에 저장하는 액션
+- 액션을 지정하면 Spark job이 시작 됨
+- Spark job은 필터를 수행 한 후 파티션별로 레코드 수를 카운트 함
+- 그리고 각 언어에 적합한 네이티브 객체에 결과를 모음  
+- 이때 Spark가 제공하는 스파크 UI로 클러스터에서 실행 중인 Spark job을 모니터링 할 수 있음  
+
+### 2.9 Spark UI
+- Spark Job의 진행 상황을 모니터링할 때 사용
+- 드라이버 노드의 4040 포트로 접속할 수 있음
+- 로컬 실행시 스파크 UI의 주소는 http://localhost:4040 임
+- Spark Job의 상태, 환경 설정, 클러스터 상태등의 정보를 확인할 수 있음
+- Spark Job을 튜닝하고 디버깅할 때 매우 유용
+- <b>Spark Job은 개별 액션에 의해 트리거되는 다수의 프렌스포메이션으로 이루어져 있으며 Spark UI로 Job을 모니터링 할 수 있음</b>만 기억하자
+
+### 2.10 종합 예제
+- 미국 교통통계국의 항공 운항 데이터 중 일부를 Spark으로 분석
+- CSV file 사용
+- tip : spark-shell에서 multi-line 입력 방법
+  - :paste 사용!
+
+#### 1. csv file 읽어오기
+~~~
+val flightData2015 = spark
+.read
+.option("inferSchema", "true")      #- 2
+.option("header", "true")           #- 3
+.csv("C:/Spark-The-Definitive-Guide-master/data/flight-data/csv/2015-summary.csv") #- 4
+~~~
+- Spark 다양한 데이터소스를 지원  
+  데이터는  SparkSession의 DataFrameReader 클래스를 사용해서 읽음
+- #2- 예제에서는 Spark DataFrame의 스키마 정보를 알아내는 <b>스키마 추론</b> 기능을 사용
+- #3- 첫 로우를 header로 지정
+- #4- data loading
+- Spark는 스키마 정보를 얻기 위해 데이터를 조금 읽고, 해당 로우의 데이터 타입을 스키마 데이터 타입에 맞게 분석
+- 운영 환경에서는 데이터를 읽는 시점에 스키마를 엄격하게 지정하는 옵션 사용 
+
+#### 2. take action으로 head와 같은 결과 확인
+~~~
+flightData2015.take(3)
+~~~
+- 스칼라와 파이썬에서 사용하는 DataFrame은 불특정 다수의 로우와 컬럼을 가짐
+- 로우의 수를 알 수 없는 이유는 데이터를 읽는 과정이 지연 연산 형태의 트랜스포메이션이기 때문
+- 
+#### 3. sort, explain 메소드 함수 사용
+- sort 메소드는 DataFrame을 변경하지 않고, 순서만 변환해 새로운 DataFrame으로 반환
+- sort는 단지 트렌스포메이션이기 때문에 호출시 아무 변화도 일어나지 않는데  
+  Spark는 실행 계획을 만들고 검토하여 클러스터에서 처리할 방법을 알아냄
+- DataFrame 객체에 explain 메소드를 호출하면 DataFrame의 계보나 Spark의 쿼리 실행 계획을 확인 할 수 있음
+~~~
+flightData2015.sort("count").explain()
+
+// 결과
+== Physical Plan ==
+*(2) Sort [count#12 ASC NULLS FIRST], true, 0
++- Exchange rangepartitioning(count#12 ASC NULLS FIRST, 200)
+   +- *(1) FileScan csv [DEST_COUNTRY_NAME#10,ORIGIN_COUNTRY_NAME#11,count#12] Batched: false, Format: CSV, Location: InMemoryFileIndex[file:/C:/Spark-The-Definitive-Guide-master/data/flight-data/csv/2015-summary.csv], PartitionFilters: [], PushedFilters: [], ReadSchema: struct<DEST_COUNTRY_NAME:string,ORIGIN_COUNTRY_NAME:string,count:int>
+~~~
+- 결과는 실행 계획을 확인할 수 있음
+- 위에서 아래 방향으로 읽으면서 최종 결과는 가장 위에, 데이터소스는 가장 아래 있음
+
+#### 4. 트랜스포메이션 실행 계획을 시작하기 위한 액션 호출
+- 액션 실행시 몇가지 설정 필요
+- Spark는 셔플 수행 시 기본적으로 200개의 셔플 파티션을 생성  
+  이 값을 5로 설정의 셔플의 출력 파티션 수를 줄여보자
+~~~
+spark.conf.set("spark.sql.shuffle.partitions", "5")
+fileData2015.sort("count").take(2)
+~~~
+- Spark는 계보를 통해 입력 데이터에 수행한 연산을 전체 파티션에서 어떻게 재연산하는지 알 수 있음
+- 이 기능은 스파크의 프로그래밍 모델인 함수형 프로그래밍의 핵심
+- 함수형 프로그래밍은 데이터 변환 규칙이 일정한 경우 같은 입력에 대해 항상 같은 출력을 생성
+- 사용자는 물리적 데이터를 직접 다루진 않지만 <b>셔플 파티션 파라미터</b>와 같은  
+  속성으로 물리적 실행 특성을 제어함
+- 출력 파티션 수를 변경하면 런타임이 크게 달라질 수 있음
+
+### 2.10.1 종합예제 : DataFrame과 SQL
+- DataFrame과 SQL을 사용하는 복잡한 작업을 수행해보자
+- Spark는 언어와 상관없이 같은 방식으로 트렌스포메이션 수행 가능
+- 사용자가 SQL이나 python, R, Scala, Java의 DataFrame으로 비즈니스 로직을 표현하면  
+  Spark 에서 실제 코드를 실행하기 전에 로직을 기본 실행 계획으로 컴파일함  
+- Spark SQL을 사용하면 모든 DataFrame을 Table이나 View로 등록 후 SQL 쿼리로 사용 가능
+- Spark는 SQL 쿼리를 DataFrame 코드와 같은 실행 계획으로 컴파일하므로  
+  둘 사이의 성능 차이는 없음
+
+#### 1. DataFrame --> Table로 변환
+- createOrReplaceTempView 메서드 호출로 Table 생성
+- 해당 명령어 수행 후 SQL로 데이터 조회 가능
+~~~
+flightData2015.createOrReplaceTempView("flight_data_2015")
+~~~
+
+#### 2. SQL 쿼리 실행
+- spark.sql 메서드로 SQL 쿼리 실행
+- spark은 SparkSession의 변수
+- DataFrame에 쿼리를 수행하면 새로운 DataFrame을 반환
+- 로직을 작성할 때 반복적인 느낌이 들지만, 매우 효율적
+- 다음 두 가지 실행 방법은 동일한 실행 계획으로 컴파일 됨!!
+~~~
+// sql query 를 통한 방식
+val sqlway = spark.sql("""
+SELECT DEST_COUNTRY_NAME, count(1)
+FROM flight_data_2015
+GROUP_BY DEST_COUNTRY_NAME
+""")
+
+// Spark DataFrame을 통한 방식
+val dataFrameWay = flightData2015
+.groupBy("DEST_COUNTRY_NAME")
+.count()
+
+sqlway.explain()
+dataFrameWay.explain()
+~~~
+
+#### 3. 특정 위치를 왕래하는 최대 비행 횟수를 구하기
+- max 함수는 필터링을 수행해 단일 로우를 결과로 반환하는 트렌스포메이션임을 기억
+~~~
+// sql
+spark.sql("SELECT max(count) from filght_data_2015").take(1)
+
+// spark dataFrame
+import org.apache.spark.sql.functions.max
+flightData2015.select(max("count")).take(1)
+~~~
+
+#### 4. 상위 5개의 도착 국가를 찾아내기
+~~~
+// sql
+val maxSql = spark.sql("""
+SELECT DEST_COUNTRY_NAME, sum(count) as destination_total
+FROM flight_data_2015
+GROUP_BY DEST_COUNTRY_NAME
+ORDER_BY sum(count) DESC
+LIMIT 5
+""")
+
+// scala
+import org.apache.spark.sql.functions.desc
+
+flightData2015
+.groupBy("DEST_COUNTRY_NAME")
+.sum("count")
+.withColumnRenamed("sum(count)", "destination_total")
+.sort(desc("destination_total"))
+.limit(5)
+.show()
+~~~
+- DataFrame의 explain()을 통해 확인해보면 총 7가지 단계가 있음
+- 실행 계획은 트랜스포메이션의 지향성 비순환 그래프(directed acyclic graph, DAG)이며,  
+  액션이 호출되면 결과 생성
+- DAG의 각 단계는 불변성을 가진 신규 DataFrame을 생성함
 
 
 
