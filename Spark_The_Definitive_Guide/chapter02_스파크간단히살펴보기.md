@@ -190,11 +190,12 @@ val divisBy2 = myRange.where("number % 2 = 0")
 - Spark은 코드를 실행하는 마지막 순간까지 대기하다가 원형 DataFrame 트렌스포메이션을 간결한  
  물리적 실행 계획으로 컴파일함
 - Spark은 이 과정을 거치며 전체 데이터 흐름을 최적화 하는 엄청난 강점을 가지고 있음
-- ex) 조건절 푸시다운(predicate pushdown)  
-  아주 복잡한 Spark job이 하나의 로우만 가져오는 필터를 가지고 있다면,  
+
+#### ex) 조건절 푸시다운(predicate pushdown)  
+- 아주 복잡한 Spark job이 하나의 로우만 가져오는 필터를 가지고 있다면,  
   필요한 레코드 하나만 읽는 것이 가장 효율적  
-  Spark은 이 필터를 데이터소스로 위임하는 최적화 작업을 자동으로 수행  
-  (만약 데이터 저장소가 DB라면 WHERE절의 처리를 위임함으로써 처리에 필요 자원을 최소화 할 수 있음)
+- Spark은 이 필터를 데이터소스로 위임하는 최적화 작업을 자동으로 수행  
+  (만약 데이터 저장소가 DB라면 WHERE절의 처리를 위임함으로써 처리에 필요 자원을 최소화 할 수 있음)  
 
 ### 2.8 액션(action)
 - 사용자는 트렌스포메이션을 사용해 논리적 실행 계획을 세울 수 있는데, 실제 연산을 수행하려면  
@@ -248,7 +249,7 @@ flightData2015.take(3)
 ~~~
 - 스칼라와 파이썬에서 사용하는 DataFrame은 불특정 다수의 로우와 컬럼을 가짐
 - 로우의 수를 알 수 없는 이유는 데이터를 읽는 과정이 지연 연산 형태의 트랜스포메이션이기 때문
-- 
+
 #### 3. sort, explain 메소드 함수 사용
 - sort 메소드는 DataFrame을 변경하지 않고, 순서만 변환해 새로운 DataFrame으로 반환
 - sort는 단지 트렌스포메이션이기 때문에 호출시 아무 변화도 일어나지 않는데  
@@ -365,3 +366,10 @@ flightData2015
   - DBMS(Oracle, My-SQL, DB2 등등)들에서 각기 다른 SQL를 사용하므로,  
   미국 표준 협회(American National Standards Institute)에서 이를 표준화하여  
   표준 SQL문을 정립 시켜 놓은 것  
+- 네이티브 객체
+  - 브라우저 혹은 구동 엔진에 내장되어 있는 객체를 말한다
+- 데이터소스(DataSource)
+  - DB와 Connection을 맺을 때, ConnectionPool에는 여러 Connection 객체가 존재  
+    이때 각각 Application에서 직접적으로 이용하면 체계적인 관리가 어렵게 되므로,   
+    DataSource라는 객체는 Connection Pool을 관리하는 목적으로 사용되는 객체
+  
