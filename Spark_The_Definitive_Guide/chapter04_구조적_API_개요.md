@@ -80,7 +80,7 @@ import org.apache.spark.sql.types._
 val b = ByteType
 ~~~
 - 스칼라 데이터 타입 매핑 정보  
-![img](C:\Spark\Spark_The_Definitive_Guide\imgs\scala_data_type_mapping.jpg)
+![img](https://github.com/koni114/Spark/blob/main/Spark_The_Definitive_Guide/imgs/scala_data_type_mapping.jpg)
 - 고정형 DataFrame을 그대로 사용하는 경우는 없으며, 대부분 DataFrame의 처리와 변환을  
  수행하므로, 구조적 API의 실행 과정을 알아야 함
 
@@ -138,3 +138,9 @@ val b = ByteType
 - Spark는 물리적 실행 계획을 선정한 다음 저수준 프로그래밍 인터페이스인 RDD를 대상으로 모든 코드 실행
 - Spark는 런타임에 전체 테스크나 스테이지를 제거할 수 있는 자바 바이트 코드를 생성해 추가적인 최적화 수행
 - 마지막으로 Spark는 처리 결과를 사용자에게 반환
+
+### 용어 정리
+- Parquet
+  - 데이터를 저장하는 방식(파일포멧) 중 하나
+  - 컬럼 기반으로 데이터를 저장하여 압축율, I/O 사용률 저하, 컬럼별 적합한 인코딩이 가능
+  - 트위터(Twitter)에서 개발한 포멧이며 소스코드를 공개한 이후 아파치에서 관리되고 있음
