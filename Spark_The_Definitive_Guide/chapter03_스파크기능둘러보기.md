@@ -59,7 +59,7 @@ spark-submit --class org.apache.spark.examples.SparkPi --master local C:\spark-2
   (scala : Dataset[T], ex) Dataset[Person] --> Person 객체)
 
 #### 예제 : 타입 안정성 함수와 DataFrame을 사용해 비즈니스 로직을 작성
-~~~
+~~~scala
 // Scala 코드
 // -1 Flight class 정의
 case class Flight(DEST_COUNTRY_NAME:String,
@@ -91,7 +91,7 @@ flights
 ### 예제 : retail 데이터셋을 이용해서 구조적 스트리밍 만들기
 - 데이터 셋에는 특정 날짜와 시간 정보가 있음
 - 여러 프로세스에서 데이터가 꾸준히 생성되는 상황이고, 저장소로 꾸준히 전송되고 있다고 가정  
-~~~
+~~~scala
 // Scala
 // 1- data read
 val staticDataFrame = spark.read.format("csv")
@@ -110,7 +110,7 @@ val staticSchema = staticDataFrame.schema
 - 특정 고객이 대량으로 구매하는 영업시간을 살펴보자  
   총 구매비용 컬럼을 추가하고, 고객이 가장 많이 소비한 날을 찾아보자
 - window 함수는 집계 시에 시계열 컬럼을 기준으로 각 날짜에 대한 전체 데이터를 가지는 윈도우를 구성
-~~~
+~~~scala
 // Scala
 import org.apache.spark.sql.functions.{window, col}
 
@@ -130,14 +130,14 @@ staticDataFrame
 ~~~
 
 - 로컬 실행시를 위해 파티션 수 조정 200(default) --> 5
-~~~
+~~~scala
 spark.conf.set("spark.sql.shuffle.partitions", "5")
 ~~~
 - 스트리밍 코드를 적용해보자
 - read 메서드 --> readStream 메서드 변환
 - maxFilesPerTrigger 옵션 추가 지정 --> 한 번에 읽을 파일 수 설정 가능
 - 이번 예제는 '스트리밍'답게 만드는 옵션이지만, 운영 환경에 적용하는 것은 비추천
-~~~
+~~~scala
 val streamingDataFrame = spark.readStream
 .schema(staticSchema)
 .option("maxFilesPerTrigger", 1)
@@ -147,12 +147,12 @@ val streamingDataFrame = spark.readStream
 ~~~
 
 - streaming 유형인지 확인
-~~~
+~~~scala
 streamingDataFrame.isStreaming
 ~~~
 
 - 앞선 DataFrame 처리와 동일한 비즈니스 로직 적용
-~~~
+~~~scala
 val purchaseByCustomerPerHour = streamingDataFrame
 .selectExpr(
     "CustomerId",
@@ -167,7 +167,7 @@ val purchaseByCustomerPerHour = streamingDataFrame
 - 스트리밍 액션은 트리거가 실행된 다음 데이터를 갱신하게 될 인메모리 테이블에 데이터 저장
 - 예제에서는 파일마다 트리거를 실행
 - total_price maximum 5를 계산할 떄 항상 더 큰 값이 발생한 경우에만 인메모리 테이블을 갱신
-~~~
+~~~scala
 // Scala
 purchaseByCustomerPerHour.writeStream
 .format("memory")                // memory = 인메모리 테이블에 저장
@@ -176,7 +176,7 @@ purchaseByCustomerPerHour.writeStream
 .start()
 ~~~
 - 스트림이 시작되면 쿼리 실행 결과가 어떠한 형태로 인메모리 테이블에 기록되는지 확인할 수 있음
-~~~
+~~~scala
 // scala
 spark.sql("""
 SELECT *
@@ -187,7 +187,7 @@ ORDER BY 'sum(total_cost)' DESC
 ~~~
 - 더 많은 데이터를 읽을수록 테이블 구성이 바뀐다는 것을 알 수 있음
 - 상황에 따라 결과를 콘솔에 출력 가능  
-~~~
+~~~scala
 // Scala
 purchaseByCustomerPerHour.writeStream
 .format("console")                // console = 결과를 콘솔에 출력  
@@ -205,12 +205,12 @@ purchaseByCustomerPerHour.writeStream
 #### 예제) 트렌스포메이션 -> 모델 예측 수행
 - 앞서 사용된 retail-DF를 가지고 모델 예측(K-means)를 수행해보자
 - printSchema 함수를 통해 data-type 확인
-~~~
+~~~scala
 staticDataframe.printSchema()
 ~~~
 - 날짜형, 문자형 등 데이터를 수치형으로 변환
 - 몇가지 DataFrame의 트랜스포메이션을 사용해 날짜 데이터를 다루는 예제
-~~~
+~~~scala
 // Scala
 import org.apache.spark.sql.functions.data_format
 
@@ -224,7 +224,7 @@ val preppendDataFrame = staticDataFrame
 
 - 데이터를 특정 날짜를 기준으로 train/test 분리
 - 액션을 통해 데이터를 분리 --> count
-~~~
+~~~scala
 // Scala
 val trainDataFrame = preppendDataFrame
 .where("InvoiceDate < 2011-07-11")
@@ -236,7 +236,7 @@ testDataFrame.count()
 ~~~
 
 - StringIndexer MLlib를 사용하여 요일 -> 수치형으로 변환
-~~~
+~~~scala
 import org.apache.spark.ml.feature.StringIndexer
 
 val indexer = new StringIndexer()
@@ -247,14 +247,14 @@ val indexer = new StringIndexer()
 - 인코딩 결과 컬럼은 벡터 타입을 구성할 컬럼 중 하나로 사용    
 - Spark의 모든 ML 알고리즘은 수치형 벡터 타입을 입력으로 사용    
   --> 이산형도 encoding을 해서 수행한다는 의미
-~~~
+~~~scala
 import org.apache.spark.ml.feature.OntHotEncoder
 val encoder = new OneHotEncoder()
 .setInputCol("day_of_week_index")
 .setOutputCol("day_of_week_encoded")
 ~~~
 - 입력값으로 들어올 데이터가 같은 프로세스를 거쳐 변환되도록 파이프라인 설정
-~~~
+~~~scala
 // Scala
 import org.apache.spark.ml.feature.VectorAssembler
 
@@ -272,7 +272,7 @@ val transformationPipeline = new Pipeline()
   - transformer를 데이터셋에 적합(fit)
   - StringIndexer는 인덱싱할 고윳값의 수를 알아야 함  
     만약 모른다면 고윳값을 조사하고 인덱싱해야함
-~~~
+~~~scala
 // pipeline에 dataFrame fit
 val fittedPipeline = transformationPipeline.fit(trainDataFrame)
 
@@ -284,12 +284,12 @@ val trainsformedTraining = fittedPipeline.transform(trainDataFrame)
 - <b>캐싱</b>을 사용하면 중간 변환된 데이터셋의 복사본을 메모리에 저장하므로,  
   전체 파이프라인을 재실행하는 것보다 훨씬 빠르게 반복적으로 데이터셋에 접근 가능
 - 다음은 cashe를 적용하는 코드임
-~~~
+~~~scala
 transformedTraining.cache()
 ~~~
 - 모델을 학습해보자
 - ML 모델을 사용하려면 관련 클래스를 임포트하고 인스턴스를 생성
-~~~
+~~~scala
 import org.apache.spark.ml.clustering.KMeans
 
 val kmeans = new KMeans()
@@ -307,7 +307,7 @@ val kmeans = new KMeans()
 - 이번 예제에서는 KMeans, KMeansModel 이라고 명명
 - MLlib의 DataFrame API에서 제공하는 estimator는 앞서 사용한 전처리 변환자(ex) StringIndexer)와 거의 동일한 인터페이스를 가지고 있음
 - 이 인터페이스를 통해 학습 과정을 단순화 할 수 있지만 이번 예제에서는 단계별 설명을 위해 생략함
-~~~
+~~~scala
 // Scala
 val kmModel = kmeans.fit(transformedTraining)
 
@@ -326,7 +326,7 @@ kmModel.computeCost(transformedTest)
   DataFrame보다 좀 더 세밀한 제어 가능
 - 드라이버 시스템의 메모리에 저장된 원시 데이터를 병렬처리하는 데 RDD 사용 할 수 있음
 - 다음은 간단한 숫자를 이용해 병렬화해 RDD를 생성하고 DataFrame으로 변환하는 예제
-~~~
+~~~scala
 // Scala
 spark.sparkContext.parallelize(Seq(1, 2, 3)).toDF()
 ~~~
@@ -336,7 +336,7 @@ spark.sparkContext.parallelize(Seq(1, 2, 3)).toDF()
 - SparkR은 Spark를 R 언어로 사용하기 위한 기능
 - SparkR은 스파크가 지원하는 모든 언어에 적용된 원칙을 동일하게 따르고 있음
 - SparkR을 설치하고 코드를 실행하면 됨
-~~~
+~~~scala
 library(SparkR)
 sparkDF <- read.df("/data/flight-data/csv/2015-summary.csv",
                   source = "csv",

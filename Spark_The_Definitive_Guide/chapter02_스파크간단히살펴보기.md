@@ -101,13 +101,13 @@ executor로 ---------------
 - SparkSession 인스턴스는 사용자가 정의한 처리 명령을 클러스터에서 실행
 - 하나의 SparkSession은 하나의 스파크 애플리케이션에 대응  
 - Scala와 python 콘솔을 시작하면 spark 변수로 SparkSession을 사용 할 수 있음
-~~~
+~~~scala
 spark
 # 다음과 같은 결과 출력
 res0: org.apache.spark.sql.SparkSession = org.apache.spark.sql.SparkSession@7ec13984
 ~~~
 - 일정 범위의 숫자를 만드는 간단한 작업을 수행
-~~~
+~~~scala
 val myRange = spark.range(1000).toDF("number")
 ~~~
 - 위의 생성한 DataFrame은 한 개의 컬럼(column)과 1000개의 로우(row)로 구성되며  
@@ -144,7 +144,7 @@ val myRange = spark.range(1000).toDF("number")
 - DataFrame을 변경하려면 원하는 변경 방법을 Spark에 알려줘야 하는데,  
   이때 사용하는 명령을 <b>트렌스포메이션</b> 이라고 함
 - 다음 코드는 DataFrame에서 짝수를 찾는 예제
-~~~
+~~~scala
 val myRange  = spark.range(1000).toDF("number")
 val divisBy2 = myRange.where("number % 2 = 0")
 ~~~
@@ -201,7 +201,7 @@ val divisBy2 = myRange.where("number % 2 = 0")
 - 사용자는 트렌스포메이션을 사용해 논리적 실행 계획을 세울 수 있는데, 실제 연산을 수행하려면  
  액션 명령을 내려야 함
 - 가장 단순한 액션인 count 메소드는 DataFrame의 전체 레코드 수를 반환
-~~~
+~~~scala
 divisBy2.count()
 ~~~
 - count 외에도 3가지 액션이 존재
@@ -228,7 +228,7 @@ divisBy2.count()
   - :paste 사용!
 
 #### 1. csv file 읽어오기
-~~~
+~~~scala
 val flightData2015 = spark
 .read
 .option("inferSchema", "true")      #- 2
@@ -255,7 +255,7 @@ flightData2015.take(3)
 - sort는 단지 트렌스포메이션이기 때문에 호출시 아무 변화도 일어나지 않는데  
   Spark는 실행 계획을 만들고 검토하여 클러스터에서 처리할 방법을 알아냄
 - DataFrame 객체에 explain 메소드를 호출하면 DataFrame의 계보나 Spark의 쿼리 실행 계획을 확인 할 수 있음
-~~~
+~~~scala
 flightData2015.sort("count").explain()
 
 // 결과
@@ -271,7 +271,8 @@ flightData2015.sort("count").explain()
 - 액션 실행시 몇가지 설정 필요
 - Spark는 셔플 수행 시 기본적으로 200개의 셔플 파티션을 생성  
   이 값을 5로 설정의 셔플의 출력 파티션 수를 줄여보자
-~~~
+
+~~~scala
 spark.conf.set("spark.sql.shuffle.partitions", "5")
 fileData2015.sort("count").take(2)
 ~~~
@@ -294,7 +295,8 @@ fileData2015.sort("count").take(2)
 #### 1. DataFrame --> Table로 변환
 - createOrReplaceTempView 메서드 호출로 Table 생성
 - 해당 명령어 수행 후 SQL로 데이터 조회 가능
-~~~
+
+~~~scala
 flightData2015.createOrReplaceTempView("flight_data_2015")
 ~~~
 
@@ -304,7 +306,8 @@ flightData2015.createOrReplaceTempView("flight_data_2015")
 - DataFrame에 쿼리를 수행하면 새로운 DataFrame을 반환
 - 로직을 작성할 때 반복적인 느낌이 들지만, 매우 효율적
 - 다음 두 가지 실행 방법은 동일한 실행 계획으로 컴파일 됨!!
-~~~
+
+~~~scala
 // sql query 를 통한 방식
 val sqlway = spark.sql("""
 SELECT DEST_COUNTRY_NAME, count(1)
@@ -323,7 +326,8 @@ dataFrameWay.explain()
 
 #### 3. 특정 위치를 왕래하는 최대 비행 횟수를 구하기
 - max 함수는 필터링을 수행해 단일 로우를 결과로 반환하는 트렌스포메이션임을 기억
-~~~
+
+~~~scala
 // sql
 spark.sql("SELECT max(count) from filght_data_2015").take(1)
 
@@ -333,7 +337,7 @@ flightData2015.select(max("count")).take(1)
 ~~~
 
 #### 4. 상위 5개의 도착 국가를 찾아내기
-~~~
+~~~scala
 // sql
 val maxSql = spark.sql("""
 SELECT DEST_COUNTRY_NAME, sum(count) as destination_total

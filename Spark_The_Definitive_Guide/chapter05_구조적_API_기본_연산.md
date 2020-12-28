@@ -117,7 +117,7 @@ expr("someCol") - 5
   - <b>컬럼은 단지 표현식일 뿐이다</b>
   - <b>컬럼과 컬럼의 트랜스포메이션은 파싱된 표현식과 동일한 논리적 실행 계획으로 컴파일됨</b>
 - 예제와 함께 자세히 알아보자(** 중요)
-~~~
+~~~scala
 ((col("someCol" + 5) * 200) - 6) < col("otherCol")
 ~~~
 - 다음은 위의 예제의 논리적 트리 개요
@@ -158,7 +158,7 @@ spark.read.format("json").load("C:/Spark-The-Definitive-Guide-master/data/flight
 - DataFrame을 사용해 드라이버에게 개별 로우를 반환하는 명령은 항상 하나 이상의 Row 타입을 반환
 
 #### DataFrame의 first 메서드로 로우 확인
-~~~
+~~~scala
 df.first()
 
 // 결과
@@ -248,7 +248,7 @@ myDF.show()
 #### 5.4.2 select 와 selectExpr
 - 해당 메서드를 사용하면 데이터 테이블에 SQL을 실행하는 것처럼 DataFrame에서도
   SQL 사용 가능
-~~~
+~~~SQL
 // SQL
 SELECT * FROM dataFrameTable
 SELECT columnName FROM dataFrameTable
@@ -439,7 +439,7 @@ df.select("ORIGIN_COUNTRY_NAME", "DEST_COUNTRY_NAME").distinct().count()
 #### 5.4.12 무작위 샘플 만들기
 - DataFrame의 sample 메서드 사용
 - DataFrame에서 표본 데이터 추출 비율을 지정할 수 있으며, 복원 추출이나 비복원 추출의 사용여부 지정 가능
-~~~
+~~~scala
 val seed = 5
 val withReplacement = false
 val fraction = 0.5
@@ -454,7 +454,118 @@ val dataFrames = df.randomSplit(Array(0.25, 0.75), seed)
 dataFrames(0).count() > dataFrames(1).count()
 ~~~
 
+#### 5.4.14 로우 합치기와 추가하기
+- DataFrame은 불변하므로, 레코드를 합치려면 기존의 DataFrame을 수정하기엔 불가능하며  
+  원본 DataFrame을 새로운 DataFrame과 통합해야함  
+- 통합하려면 두 개의 DataFrame은 반드시 동일한 스키마와 컬럼 수를 가져야 함
+- <b>union 메소드는 컬럼명(스키마) 기반 병합이 아닌, 컬럼 위치를 기반으로 동작</b>
+~~~scala
+import org.apache.spark.sql.Row
+val schema = df.schema
+val newRows = Seq(
+  Row("New Country", "Other Country", 5L),
+  Row("New Country 2", "Other Country 3", 1L)
+)
+
+val parallelizedRows = spark.sparkContext.parallelized(newRows)
+val newDF = spark.createDataFrame(parallelizedRows, schema)
+
+df.union(newDF)
+.where("count = 1")
+.where($"ORIGIN_COUNTRY_NAME" =!= "United States")
+.show() // 전체 데이터 조회시, 신규 데이터 확인 가능
+~~~
+- 스칼라에서는 반드시 =!= 연산자 사용해야 함  
+  컬럼 표현식과 문자열을 비교했을 때, =!= 연산자 사용시 컬럼 표현식($"ORIGIN_COUNTRY_NAME")  
+  이 아닌 컬럼의 실제값을 비교 대상 문자열(United States)과 비교
+~~~scala
+// 결과
+~~~
+- DataFrame을 View로 만들거나, 테이블로 등록하면 DataFrame의 변경작업과 관계없이  
+  동적으로 참조 가능
+
+#### 5.4.15 로우 정렬하기
+- sort와 orderBy 메서드를 이용해 DataFrame 정렬 가능
+- 두 메서드는 완전히 같은 방식으로 동작함  
+  (spark code를 살펴보면 orderBy 메소드에서 sort 메소드 호출)
+- 두 메서드 모두 컬럼 표현식과 문자열을 사용할 수 있음  
+  또한 다수의 컬럼 지정 가능
+- 기본 동작 방식은 오름차순 정렬
+~~~scala
+// Scala
+import org.apache.spark.sql.functions.{desc, asc}
+df.orderBy(expr("count desc")).show(2)
+df.orderBy(desc("count"), asc("DESC_COUNTRY_NAME")).show(2)
+~~~
+~~~SQL
+// SQL
+SELECT * FROM dfTable ORDER BY count DESC, DEST_COUNTRY_NAME ASC LIMIT 2
+~~~
+- `asc_nulls_first`, `desc_nulls_first`, `asc_nulls_last`, `desc_nulls_last` 메서드를 이용하여 null 값을 가지는 레코드의 위치를 지정할 수 있음  
+- 예를들어 `asc_nulls_first` 함수는 null값은 제일 상단에 위치함
+- 트랜스포메이션을 처리하기 전에 성능 최적화를 위해 파티션별 정렬을 수행하기도 함  
+  `sortWithinPartitions` 메서드로 가능
+~~~scala
+spark.read.format("json").load("/data/flight-data/json/*-summary.json")
+.sortWithinPartitions("count")
+~~~
+
+#### 5.4.16 로우 수 제한하기
+- DataFrame에서 추출할 로우 수를 제한해야 할 때가 있음  
+  예를들어 DataFrame에서 상위 10개의 결과만을 보고자 할 때 등
+- `limit` 메서드를 이용해서 추출할 로우 수 제한
+~~~scala
+df.limit(5).show()
+df.orderBy(expr("count desc")).limit(6).show()
+~~~
+
+#### 5.4.17 repartition과 coalesce
+- 또 다른 최적화 기법으로 자주 filtering하는 컬럼을 기준으로 데이터를 분할 하는 것
+- 이를 통해 파티셔닝 스키마와 파티션 수를 포함해 클러스터 전반의 물리적 데이터 구성을 제어할 수 있음
+- `repartition` 메서드를 호출하면 무조건 전체 데이터를 셔플함  
+  향후에 사용할 파티션 수가 현재 파티션 수보다 많거나 컬럼을 기준으로 파티션을 만드는 경우에만 사용해야 함
+~~~scala
+df.rdd.getNumPartitions // 1
+df.repartition(5)       //- partition 수 재지정
+df.repartition(col("DSET_COUNTRY_NAME")) //- 자주 필터링되는 컬럼을 기준으로 파티션 재분배
+~~~
+- 선택적으로 파티션 수를 지정할 수도 있음
+~~~scala
+df.repartition(5, col("DEST_COUNTRY_NAME"))
+~~~
+- `coalesce` 메서드는 전체 데이터를 셔플하지 않고 파티션을 병합하려는 경우에 사용  
+(파티션 수를 줄이려면 셔플이 일어나는 `repartition` 대신 `coalesce` 사용해야 함)  
+- 다음은 목적지를 기준으로 셔플을 수행해 5개의 파티션으로 나누고, 전체 데이터를 셔플 없이 평합하는 예제
+~~~scala
+df.repartition(5, col("DEST_COUNTRY_NAME")).coalesce(2)
+~~~
+
+#### 5.4.18 드라이버로 로우 데이터 수집하기
+- Spark는 드라이버에서 클러스터 상태 정보를 유지함 
+- 로컬 환경에서 데이터를 다루려면 드라이버로 데이터를 수집해야함
+- 아직 드라이버로 데이터를 수집하는 연산은 정확하게 설명하지 않았지만  
+  몇 가지 메서드는 사용해 보았음
+- `collect` 메서드는 전체 DataFrame의 모든 데이터를 수집  
+  `take` 메서드는 상위 N개의 로우를 반환  
+  `show` 메서드는 여러 로우를 보기 좋게 출력
+~~~scala
+val collectDF = df.limit(10)
+collectDF.take(5)
+collectDF.show()
+collectDF.show(5, false)
+collectDF.collect()
+~~~
+
+- 전체 데이터셋에 대한 반복(iterate) 처리를 위해 드라이버로 로우를 모우는 또 다른 방법이 있음  
+- `toLocalIterator` 메서드는 이터레이터(iterator) 로 모든 파티션의 데이터를 드라이버로 전달  
+  `toLocalIterator` 메서드를 사용해 데이터셋의 파티션을 차례로 반복 처리 가능
+~~~scala
+collectDF.toLocalIterator()
+~~~
+- 드라이버로 모든 데이터 컬랙션을 수집하는 작업은 매우 큰 비용(CPU, 메모리, 네트워크)이 발생
+- 대규모 데이터셋에 `collect` 명령을 수행하면 드라이버가 비정상적으로 종료될 수 있음
+- `toLocalIterator` 메서드도 마찬가지임. 또한 연산을 병렬로 수행하지 않고 차례로 처리하기 때문에 시간이 오래걸림
+
 ### 용어 정리
 - 함수와 메소드의 차이
   - 함수는 독립적이고, 메소드는 class에 종속적임
-

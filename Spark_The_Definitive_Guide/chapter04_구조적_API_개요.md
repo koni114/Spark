@@ -35,7 +35,7 @@
 - 각 언어에 대한 매핑 테이블을 가지고 있음
 -  python이나 R을 이용해 Spark의 구조적 API를 사용하더라도 대부분의 연산은 Spark의 데이터 타입을 사용
 - 다음 예제 코드는 Scala나 python이 아닌 Spark의 덧셈 연산 수행
-~~~
+~~~scala
 // Scala
 val df = spark.range(500).toDF("number")
 df.select(df.col("number") + 10)
@@ -66,7 +66,7 @@ df.select(df.col("number") + 10)
 - DataFrame의 레코드는 Row 타입으로 구성
 - 로우는 SQL, RDD, 데이터소스에서 얻거나 직접 만들 수 있음
 - 다음은 range 메소드를 이용해 DataFrame을 생성하는 예제
-~~~
+~~~scala
 // Row 객체로 이루어진 배열 반환
 spark.range(2).toDF().collect()
 ~~~
@@ -75,7 +75,7 @@ spark.range(2).toDF().collect()
 - 다양한 언어별 데이터 타입 매핑 정보를 보여줌 (p.116 ~ p.117)
 - 특정 데이터 타입의 컬럼을 초기화하고 정의하는 방법을 알아보자
 - Spark 데이터 타입을 스칼라에서 사용하려면 다음과 같은 코드 사용
-~~~
+~~~scala
 import org.apache.spark.sql.types._
 val b = ByteType
 ~~~
