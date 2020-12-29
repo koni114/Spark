@@ -280,3 +280,324 @@ val selectedColumns = simpleColors.map(color => {
 df.select(selectedColumns:_*).where(col("is_white").or(col("is_red"))).select("Description").show(3, false)
 ~~~
 - `locate` 함수를 사용하면 문자열의 위치를 정수로 반환
+
+### 6.6 날짜와 timestamp 데이터 타입 다루기
+- Spark는 날짜형의 복잡함을 피하고자 두 가지 종류의 시간 관련 정보만 집중적으로 관리함
+- 하나는 <b>달력 형태의 날짜(date)</b>이고, 다른 하나는 날짜와 시간 정보를 모두 가지는 <b>timestamp</b>임
+- Spark는 inferschema 옵션이 활성화된 경우 날짜와 타임스탬프를 포함해  
+  컬럼의 데이터 타입을 최대한 정확하게 식별하려 시도함
+- <b>Spark는 특정 날짜 포멧을 명시하지 않아도 자체적으로 식별해 데이터를 읽을 수 있음</b>
+- 날짜와 timestamp를 다루는 작업은 문자열을 다루는 작업과 관련이 많음  
+  날짜나 시간을 문자열로 저장하고 런타임에 날짜 타입으로 변환하는 경우가 많기 때문
+- 데이터베이스나 구조적 데이터를 다룰 때는 이러한 작업이 드물지만,  
+  텍스트나 CSV 파일을 다룰 때는 많이 발생함
+- 만약 특이한 포맷의 날짜와 시간 데이터를 어쩔 수 없이 읽어야 한다면  
+  각 단계별로 어떤 데이터 타입과 포맷을 유지하는지 정확히 알고 트랜스포메이션을 적용해야 함
+- `TimestampType` 클래스는 초 단위 정밀도까지 지원함  
+  만약 밀리세컨드나 마이크로세컨드 단위를 다룬다면 Long DataType으로 데이터를 변환해  
+  처리하는 우회 정책을 사용해야 함
+- 그 이상의 정밀도는 `TimestampType`으로 변환될 때 제거
+- Spark는 특정 시점에 데이터 포멧이 약간 특이하게 변할 수 있음  
+  이런 문제를 피하려면 파싱이나 변환 작업을 해야함
+- 다음은 오늘 날짜와 타임스탬프 값을 구하는 예제
+~~~scala
+import org.apache.spark.sql.functions.{current_date, current_timestamp}
+val dateDF = spark.range(10)
+.withColumn("today", current_date())
+.withColumn("now", current_timestamp())
+
+dateDF.createOrReplaceTempView("dateTable")
+dateDF.printSchema()
+~~~
+- 위 예제로 만들어진 DataFrame을 사용해 오늘을 기준으로 5일 전후의 날짜를 구해보자
+- `date_sub` 함수와 `date_add` 함수는 컬럼과 더하거나 뺄 날짜 수를 인수로 전달 해야함
+~~~scala
+import org.apache.spark.sql.functions.{date_add, date_sub}
+dateDF.select(date_sub(col("today"), 5), date_add(col("today"), 5)).show(1)
+
+// 결과
++------------------+------------------+
+|date_sub(today, 5)|date_add(today, 5)|
++------------------+------------------+
+|        2020-12-24|        2021-01-03|
++------------------+------------------+
+only showing top 1 row
+~~~
+- 두 날짜의 차이를 구하는 작업도 자주 발생함  
+  두 날짜 사이의 일 수를 반환하는 `datediff` 함수를 사용해 이러한 작업 수행 가능
+- 두 날짜 사이의 개월 수를 반환하는 `months_between` 함수도 있음
+~~~scala
+import org.apache.spark.sql.functions.{datediff, months_between, to_date}
+dateDF.withColumn("week_ago", date_sub(col("today"), 7))
+.select(datediff(col("week_ago"), col("today"))).show(1)
+
+dateDF.select(
+  to_date(lit("2016-01-01")).alias("start"),
+  to_date(lit("2017-05-22")).alias("end"))
+.select(months_between(col("start"), col("end"))).show(1)
+~~~
+- `to_date` 함수는 문자열을 날짜로 변환할 수 있으며 필요에 따라 날짜 포멧도 함께 지정 가능
+- 함수의 날짜 포멧은 반드시 <b>Java의 `SimpleDateFormat` 클래스가 지원하는 포멧을 사용해야 함</b>
+- Spark는 날짜를 파싱할 수 없다면 null 값을 반환함  
+  다단계 처리 파이프라인에서는 조금 까다로울 수 있음. why? 날짜 데이터 포멧의 데이터가 추가로 나타날 수 있기 때문
+- 다음은 년-일-월 형태의 날짜 포멧을 사용해보자 
+  Spark 는 날짜를 파싱할 수 없으므로, null값 반환  
+~~~scala
+dateDF.select(to_date(lit("2016-20-12")), to_date(lit("2017-12-11"))).show(1)
+// 결과
++---------------------+---------------------+
+|to_date('2016-20-12')|to_date('2017-12-11')|
++---------------------+---------------------+
+|                 null|           2017-12-11|
++---------------------+---------------------+
+only showing top 1 row
+~~~ 
+- 원래 의도한 날짜인(2017-11-12)가 2017-12-11로 잘못 표기되어 나타나고 있음  
+  즉 디버깅하기 매우 까다로움
+- 위의 문제를 해결하기 위하여 견고한 방법을 찾아보자
+- 먼저 자바의 `SimpleDateFormat`에 맞춰 날짜 포맷을 지정
+- 문제를 해결하기 위하여 `to_date`함수와 `to_timestamp` 함수를 사용  
+  `to_date` 함수는 필요에 따라 날짜 포맷을 지정할 수 있지만, `to_timestamp` 함수는 반드시 날짜 포멧을 지정해야 함
+~~~scala
+import org.apache.spark.sql.functions.{to_date}
+
+val dateFormat = "yyyy-dd-MM"
+val cleanDateDF = spark.range(1).select(
+  to_date(lit("2017-12-11"), dateFormat).alias("date"),
+  to_date(lit("2017-20-12"), dateFormat).alias("date2"))
+
+cleanDateDF.createOrReplaceTempView("dateTable2")
+~~~
+~~~SQL
+SELECT to_date(date, 'yyyy-dd-MM'), to_date(date2, 'yyyy-dd-MM'), to_date(date)
+FROM dateTable2
+~~~
+- 항상 날짜 포멧을 지정해야 하는 `to_timestamp` 함수의 예제를 살펴보자
+~~~scala
+import org.apache.spark.sql.functions.{to_timestamp}
+cleanDateDF.select(to_timestamp(col("date"), dateFormat)).show()
+// 결과
++----------------------------------+
+|to_timestamp(`date`, 'yyyy-dd-MM')|
++----------------------------------+
+|               2017-11-12 00:00:00|
++----------------------------------+
+~~~
+- 올바른 포맷과 타입의 날짜나 타임스탬프를 사용한다면 쉽게 비교 가능
+- 날짜를 비교할 때는 날짜나 타임스탬프 타입을 사용하거나 yyyy-MM-dd 포맷에 맞는 문자열을 지정함
+~~~scala
+cleanDateDF.filter(col("date2") > lit("2017-12-12")).show()
+~~~
+- Spark가 리터럴로 인식하는 문자열을 지정해 날짜를 비교할 수도 있음
+~~~scala
+cleanDateDF.filter(col("date2") > "'2017-12-12'").show()
+~~~
+- 암시적 형변환은 매우 위험함  
+  특히 null 값 또는 다른 시간대나 포맷을 가진 날짜 데이터를 다룰 때는 더 위험함
+- 암시적 형변환에 의지하지 말고 명시적으로 데이터 타입을 변환해 사용하자
+
+### 6.7 null 값 다루기
+- Spark에서는 빈 문자열이나 대체 값 대신 null값을 사용해야 최적화를 수행할 수 있음
+- DataFrame의 하위 패키지인 <b>.na</b>를 사용하는 것이 DataFrame에서 null 값을 다루는 기본 방식
+- 또한 연산을 수행하면서 스파크가 null값을 제어하는 방법을 명시적으로 지정하는 몇 가지 함수도 있음
+- null 값을 허용하지 않는 컬럼을 선언해도 <b>강제성</b>은 없음  
+  즉, null값을 허용하지 않는 컬럼에 null 값을 컬럼에 넣을 수 있다는 얘기
+- 만약 null 값이 없어야 하는 컬럼에 null 값이 존재한다면, 
+  부정확한 결과를 초래하거나 디버깅하기 어려운 특잏나 오류를 만날 수 있음
+- null 값을 다루는 방법은 두가지가 있음
+  - 명시적으로 null 값을 제거
+  - 전역 또는 컬럼 단위로 null 값을 특정 값으로 채워 넣기
+
+#### 6.7.1 coalesce
+- Spark의 `coalesce` 함수는 값이 있으면 해당 값을 반환하고, 값이 null이면 여러 인수 중
+  값을 가지는 첫 번째 인수 값을 반환
+- 아래 예시는 Description 컬럼의 값이 null인지 확인하여 null이면 CustomerId 값을 반환하고, 
+null이 아니면 description 컬럼 값을 반환하는 예제
+~~~scala
+import org.apache.spark.sql.functions.coalesce
+df.select(coalesce(col("Description"), col("CustomerId"))).show()
+~~~
+
+#### 6.7.2 ifnull, nullIf, nvl, nvl2
+- `ifnull` : 첫 번째 값이 null이면 두 번째 값 반환
+- `nullif` : 두 값이 같으면 null 반환, 두 값이 다르면 첫 번째 값 반환
+- `nvl` : 첫 번째 값이 null이면 두 번째 값을 반환. 첫 번째 값이 null이 아니면 첫 번째 값 반환
+- `nvl2` : 첫 번째 값이 null이 아니면 두 번째 값 반환. 첫 번째 값이 null이면 세 번째 인수로 저장된 값 반환
+~~~SQL
+SELECT
+  ifnull(null, 'return_value'),
+  nullIf('value', 'value'),
+  nvl(null, 'return_value'),
+  nvl2('not_null', 'return_value', 'else_value')
+FROM dfTable LIMIT 1
+~~~
+
+#### 6.7.3 drop 
+- null 값을 가진 로우를 제거하는 가장 간단한 함수
+- null 값을 가지는 모든 row를 제거
+~~~scala
+df.na.drop()
+df.na.drop("any")
+~~~
+- any를 지정한 경우는 로우의 컬럼값 중 하나라도 null 값을 가지면 해당 로우 제거
+- all을 지정한 경우 모든 컬럼 값이 null/NaN인 경우에만 해당 로우 제거
+~~~scala
+df.na.drop("all")
+~~~ 
+- drop 메서드에 배열 형태의 컬럼을 인수로 전달해 적용할 수도 있음
+~~~scala 
+df.na.drop("all", Seq("StockCode", "InvoiceNo"))
+~~~
+
+#### 6.7.4 fill
+- `fill` 함수를 사용해 하나 이상의 컬럼을 특정 값으로 채울 수 있음
+- 채워 넣을 값, 컬럼 집합으로 구성된 Map을 인수로 사용
+- 예를 들어 String, Integer 데이터 타입의 컬럼에 존재하는 null 값을 다른 값으로 채워 넣는 방법은 다음과 같음
+~~~scala
+df.na.fill("All Null values become this String") // String type
+df.na.fill(5, Seq("StockCode", "InvoiceNo")) // Integer type
+~~~
+- <b>Scala Map 타입을 사용해 다수의 컬럼에 fill 메서드를 적용할 수도 있음</b>  
+  여기서 Key는 컬럼명이며, value는 null값을 채우는데 사용할 값
+~~~scala 
+val fillColValues = Map("StockCode" -> 5, "Description" -> "No value")
+df.na.fill(fillColValues)
+~~~
+
+#### 6.7.5 replace
+- 조건에 따라 다른 값으로 대체하는 방법
+- `replace` 메서드를 사용하려면 변경하고자 하는 값과 원래 값의 데이터 타입이 같아야 함
+~~~Scala
+df.na.replace("Description", Map("" -> "UNKNOWN"))
+~~~
+
+### 6.8 정렬하기
+- 5장에서 설명한 것처럼 `asc_nulls_first`, `desc_nulls_first`, `asc_nulls_last`, `desc_nulls_last` 함수를 사용해 DataFrame을 정렬할 때 null 값이 표시되는 기준을 지정할 수 있음
+
+### 6.9 복합 데이터 타입 다루기
+- 복합 데이터 타입을 사용하면 해결하려는 문제에 더욱 적합한 방식으로 데이터를 구성하고 구조화할 수 있음
+- 복합 데이터 타입에는 구조체(struct), 배열(array), 맵(map)이 있음
+
+#### 6.9.1 구조체
+- 구조체는 DataFrame 내부의 DataFrame으로 생각할 수 있음
+- 쿼리문에서 다수의 컬럼을 괄호로 묶어 구조체를 만들 수 있음
+~~~scala
+df.selectExpr("(Description, InvoiceNo) as complex", "\*")
+df.selectExpr("struct(Description, InvoiceNo) as complex", "\*")
+
+import org.apache.spark.sql.functions.struct
+val complexDF = df.select(struct("Description", "InvoiceNo").alias("complex"))
+complexDF.createOrReplaceTempView("complexDF")
+~~~
+- 복합 데이터 타입을 가진 DataFrame을 만들어 보았음
+- 이를 다른 DataFrame을 조회하는 것과 동일하게 사용할 수 있는데,  
+  차이점은 문법에 (.)을 사용하거나 getField 메서드를 사용한다는 점
+~~~scala
+complexDF.select("complex.Description")
+complexDF.select(col("complex").getField("Description"))
+~~~
+- (*) 문자를 사용해 모든 값을 조회할 수 있으며, 모든 컬럼을 DataFrame의 최상위 수준으로 끌어올릴 수 있음
+~~~scala
+complexDF.select("complex.*")
+~~~
+
+#### 6.9.2 배열
+- 데이터에서 Description 컬럼의 모든 단어를 하나의 로우로 변환해보자
+- Description 컬럼을 복합 데이터 타입인 배열로 변환
+
+#### split
+- 배열로 변환하려면 `split` 함수 사용. split 함수에 구분자를 인수로 전달해 배열로 변환
+~~~scala
+import org.apache.spark.sql.functions.split
+df.select(split(col("Description"), " ")).show(2)
+~~~
+- `split` 함수는 Spark에서 복합 데이터 타입을 마치 또 다른 컬럼처럼 다룰 수 있는 강력한 기능 중 하나
+~~~scala
+df.select(split(col("Description"), " ")).alias("array_col")
+.selectExpr("array_col[0]").show(2)
+~~~
+
+#### 배열의 길이
+- `size` 함수를 이용해 배열의 길이를 알 수 있음
+~~~scala
+import org.apache.spark.sql.functions.sizes
+df.select(size(split(col("Description"), " "))).show(2) // 5와 3 출력
+~~~
+
+#### array_contains
+- `array_contains` 함수를 사용해 배열에 특정 값이 존재하는지 확인 가능
+~~~scala
+import org.apache.spark.sql.functions.array_contains
+df.select(array_contains(split(col("Description"), " "),  "WHITE")).show(2)
+// 실행 결과
++--------------------------------------------+
+|array_contains(split(Description,  ), WHITE)|
++--------------------------------------------+
+|                                        true|
+|                                        true|
++--------------------------------------------+
+~~~
+- 복합 데이터 타입의 배열에 존재하는 모든 값을 로우로 변환하려면 `explode` 함수 사용
+
+#### explode
+- `explode` 함수는 배열 타입의 컬럼을 입력 받음. 그리고 입력된 컬럼의 배열값에  
+  포함된 모든 값을 로우로 변환
+- 나머지 컬럼값은 중복되어 표시
+~~~
+"Hello World", "other col" (split 함수 적용) --> ["Hello", "World"], "other col"
+  (explode 함수 적용) --> "Hello", "other col"
+                          "World", "other col"
+~~~
+~~~scala
+import org.apache.spark.sql.functions.{split, explode}
+df.withColumn("splitted", split(col("Description"), " "))
+  .withColumn("exploded", explode(col("splitted")))
+  .select("Description", "InvoiceNo", "exploded").show(2)
+
+// 실행 결과
++--------------------+---------+--------+
+|         Description|InvoiceNo|exploded|
++--------------------+---------+--------+
+|WHITE HANGING HEA...|   536365|   WHITE|
+|WHITE HANGING HEA...|   536365| HANGING|
++--------------------+---------+--------+
+~~~
+
+#### 6.9.3 맵
+- 맵은 map 함수와 컬럼의 키-값 쌍을 이용해 생성
+- 배열과 동일한 방법으로 값을 선택 가능
+~~~scala
+import org.apache.spark.sql.functions.map
+df.select(map(col("Description"), col("InvoiceNo")).alias("complex_map")).show(2, false)
+// 실행 결과
++----------------------------------------------+
+|complex_map                                   |
++----------------------------------------------+
+|[WHITE HANGING HEART T-LIGHT HOLDER -> 536365]|
+|[WHITE METAL LANTERN -> 536365]               |
++----------------------------------------------+
+~~~
+- 적합한 key를 사용해 데이터를 조회할 수 있으며, 해당 키가 없다면 null 값 반환
+~~~scala
+df.select(map(col("Description"), col("InvoiceNo")).alias("complex_map"))
+.selectExpr("complex_map['WHITE METAL LANTERN']").show(2)
+// 결과
++--------------------------------+
+|complex_map[WHITE METAL LANTERN]|
++--------------------------------+
+|                            null|
+|                          536365|
++--------------------------------+
+~~~
+- map 타입은 분해하여 컬럼으로 변환 가능
+~~~scala
+df.select(map(col("Description"), col("InvoiceNo")).alias("complex_map"))
+.selectExpr("explode(complex_map)").show(2)
+// 결과 
++--------------------+------+
+|                 key| value|
++--------------------+------+
+|WHITE HANGING HEA...|536365|
+| WHITE METAL LANTERN|536365|
++--------------------+------+
+~~~

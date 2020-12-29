@@ -19,7 +19,7 @@ df.printSchema()
 
 ### 5.1 스키마
 - 스키마는 DataFrame의 컬럼명과 컬럼 타입을 정의함
-- 데이터소스에서 스카마를 얻거나 직접 정의할 수 있음
+- 데이터소스에서 스키마를 얻거나 직접 정의할 수 있음
 - 데이터를 읽기 전에 스키마를 정의해야 하는지의 여부는 상황에 따라 달라짐
 - 비정형 분석에서는 스키마-온-리드가 대부분 잘 작동(CSV JSON 같은 일반 텍스트 파일을 사용하면 다소 느릴 수 있음)
 - 하지만 Long Type을 Integer Type으로 잘못 인식 하는 등 정밀도의 문제가 발생할 수 있음
@@ -37,7 +37,7 @@ org.apache.spark.sql.types.StructType = StructType(StructField(DEST_COUNTRY_NAME
                                                    StructField(count,LongType,true))
 ~~~
 - 여러 개의 StructField 타입 필드로 구성된 StructType 객체
-- StructField은 (이름, 데이터 타입, 컬럼값 유무(hull)) 로 구성
+- StructField은 (이름, 데이터 타입, 컬럼값 유무(null)) 로 구성
 - 필요한 경우 컬럼과 관련된 <b>메타데이터</b>를 지정 할 수 있는데, 메타데이터는 해당 컬럼과 관련된 정보이며, Spark의 MLlib에서 사용
 - 스키마는 복합 데이터 타입인 StructType을 가질 수 있음
 - Spark는 런타임에 데이터 타입이 스키마의 데이터 타입과 일치하지 않으면 오류 발생
@@ -88,7 +88,7 @@ $"myColumn" // $ 마크 이용
 #### 명시적 컬럼 참조
 - DataFrame의 컬럼은 col 함수를 통해 참조
 - col 메서드는 조인 시 유용
-- col 메서드를 사용해 명시적으로 컬럼을 정의하면 Spark는 분석기 실행 단계에서 컬럼 확인 절차 생략
+- <b>col 메서드를 사용해 명시적으로 컬럼을 정의하면 Spark는 분석기 실행 단계에서 컬럼 확인 절차 생략</b>
 ~~~scala
 df.col("count")
 ~~~
@@ -302,7 +302,7 @@ df.select(col("DEST_COUNTRY_NAME"), "DEST_COUNTRY_NAME")
 - AS 키워드로 컬럼명 변경 후, alias 메서드로 원래 컬럼명으로 되돌려보자
 - 보통 select 함수에 expr 메소드를 자주 사용함
 ~~~scala
-df select(expr("DEST-COUNTRY_NAME AS destination")).alias("DEST_COUNTRY_NAME").show(2)
+df select(expr("DEST_COUNTRY_NAME AS destination")).alias("DEST_COUNTRY_NAME").show(2)
 ~~~
 
 - selectExpr 메서드를 사용하여 간단하고 효율적으로 할 수 있음
@@ -328,6 +328,7 @@ df.selectExpr("avg(count)", "count(distinct(DEST_COUNTRY_NAME))").show(2)
 - 명시적인 값은 상숫값일 수 있고, 추후 비교에 사용할 무언가가 될 수도 있음
 - 이때 <b>리터럴</b>을 사용하는데, 프로그래밍 언어의 리터럴 값을  
   스파크가 이해할 수 있는 값으로 변환
+- `lit` 메소드 사용
 ~~~scala
 import org.apache.spark.sql.functions.lit
 df.select(expr("*"), lit(1).as("One")).show(2)
@@ -417,10 +418,10 @@ df.withColumn("count2", col("count").cast("string"))
 #### 5.4.10 로우 필터링하기
 - 로우를 필터링하려면 참과 거짓을 판별하는 표현식이 필요
 - DataFrame의 가장 일반적인 표현식이나 컬럼을 다루는 기능을 이용해 표현식을 만드는 것
-- where, filter 메서드로 필터링 가능
+- `where`, `filter` 메서드로 필터링 가능
 - 두 메서드 모두 같은 연산을 수행하며 같은 파라미터 타입 사용
-- 이 중 SQL과 유사한 where 메서드를 앞으로 계속 사용하겠지만, 
-  filter도 사용할 수 있다는 점 기억하자
+- 이 중 SQL과 유사한 `where` 메서드를 앞으로 계속 사용하겠지만, 
+  `filter`도 사용할 수 있다는 점 기억하자
 ~~~scala
 df.filter(col("count") < 2).show(2)
 df.where("count < 2").show(2)
@@ -546,6 +547,7 @@ df.repartition(5, col("DEST_COUNTRY_NAME")).coalesce(2)
 - 아직 드라이버로 데이터를 수집하는 연산은 정확하게 설명하지 않았지만  
   몇 가지 메서드는 사용해 보았음
 - `collect` 메서드는 전체 DataFrame의 모든 데이터를 수집  
+  (데이터셋을 드라이버에 다시 가져오기 위해 액션을 수행)
   `take` 메서드는 상위 N개의 로우를 반환  
   `show` 메서드는 여러 로우를 보기 좋게 출력
 ~~~scala
@@ -569,3 +571,5 @@ collectDF.toLocalIterator()
 ### 용어 정리
 - 함수와 메소드의 차이
   - 함수는 독립적이고, 메소드는 class에 종속적임
+- 스키마-온-리드
+  - 데이터의 스키마 파악을 데이터를 read하는 시점에 한다는 의미
