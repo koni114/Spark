@@ -601,3 +601,132 @@ df.select(map(col("Description"), col("InvoiceNo")).alias("complex_map"))
 | WHITE METAL LANTERN|536365|
 +--------------------+------+
 ~~~
+
+### 6.10 JSON 다루기
+- Spark는 JSON을 다루기 위한 몇 가지 고유 기능을 지원
+- Spark에서는 문자열 형태의 JSON을 직접 조작할 수 있으며, JSON을 파싱하거나  
+  객체로 만들 수 있음
+- 다음은 JSON 컬럼을 생성하는 예제
+~~~
+val jsonDF = spark.range(1).selectExpr("""
+'{"myJSONKey" : {"myJSONValue" : [1, 2, 3]}}' as jsonString""")
+~~~
+- `get_json_object` 함수로 JSON 객체(딕셔너리나 배열)를 인라인 쿼리로 조회할 수 있음  
+  중첩이 없는 단일 수준의 JSON 객체라면 `json_tuple`을 사용할 수도 있음
+~~~scala
+import org.apache.spark.sql.functions.{get_json_object, json_tuple}
+jsonDF.select(
+  get_json_object(col("jsonString"), "$.myJSONKey.myJSONValue[1]") as "column",
+  json_tuple(col("jsonString"), "myJSONKey")).show(2)
+~~~
+- `to_json` 함수를 사용해 StrucType을 JSON 문자열로 변경할 수 있음
+~~~scala
+import org.apache.spark.sql.functions.to_json
+df.selectExpr("(InvoiceNo, Description) as myStruct")
+.select(to_json("myStruct"))
+~~~
+- `to_json` 함수에 JSON 데이터소스와 동일한 형태의 딕셔너리(맵)을 파라미터로 사용할 수 있음
+- `from_json` 함수를 사용해 JSON 문자열을 다시 객체로 변환 할 수 있음
+- `from_json` 함수는 파라미터로 반드시 스키마를 지정해야 함. 필요에 따라 맵 데이터 타입의 옵션을 인수로 지정할 수 있음
+~~~scala
+import org.apache.spark.sql.functions.{to_json, from_json}
+val parseSchema = StructType(Array(
+  new StructField("InvoiceNo", StringType, true),
+  new StructField("Description", StringType, true)))
+
+df.selectExpr("(InvoiceNo, Description) as myStruct")
+.select(to_json(col("myStruct")).alias("newJSON"))
+.select(from_json(col("newJSON"), parseSchema), col("newJSON")).show(2)
+~~~
+
+### 6.11 사용자 정의 함수(User Define Function)
+- Spark의 가장 강력한 기능 중 하나는 UDF를 사용할 수 있다는 점
+- UDF는 파이썬이나 스칼라 그리고 외부 라이브러리를 사용해 사용자가 원하는 형태로 트랜스포메이션을 만들 수 있게 함
+- UDF는 하나 이상의 컬럼을 입력으로 받고, 반환할 수 있음
+- Spark UDF는 여러 가지 프로그래밍 언어로 개발할 수 있으므로 엄청나게 강력함
+- UDF는 레코드별로 데이터를 처리하는 함수이기 때문에 독특한 포멧이나 도메인에 특화된 언어를 사용하지 않음
+- UDF는 기본적으로 특정 sparkSession이나 Context에서 사용할 수 있도록 임시 함수 형태로 등록됨
+- Scala, python, java로 UDF를 개발할 수 있음  
+  하지만 언어별로 성능에 영향을 미칠 수 있으므로 주의해야 함
+- 성능 차이를 설명하기 위하여 UDF를 생성해서 Spark에 등록하고, 생성된 UDF를 사용해  
+  코드를 실행하는 과정에서 정확히 무슨 일이 발생하는지 알아보겠음
+- 첫 번째로 실제 함수가 필요함  
+  예제로 사용할 UDF를 만들어 보겠음. 숫자를 입력받아 세제곱 연산을 하는 power3 함수를 개발해보자
+~~~scala
+val udfExampleDF = spark.range(5).toDF("num")
+def power3(number:Double):Double = number * number * number
+power3(2.0)
+~~~
+- 이제 함수를 만들었으므로 모든 워커 노드에서 생성된 함수를 사용할 수 있도록 Spark에 등록할 차례임
+- <b>Spark는 드라이버에서 함수를 직렬화하고 네트워크를 통해 모든 익스큐터 프로세스로 전달</b>  
+이 과정은 언어와 관계없이 발생함
+- 함수를 개발한 언어에 따라서 근본적으로 동작하는 방식이 달라짐
+
+#### Scala, Java UDF
+- Scala나 Java로 함수를 작성했다면 JVM 환경에서만 사용할 수 있음  
+  따라서 Spark 내장 함수가 제공하는 코드 생성 기능의 장점을 활용할 수 없어 약간의 성능 저하가 발생함
+
+ #### 파이썬 UDF 
+- 파이썬으로 함수를 작성했다면 매우 다르게 작동함  
+  Spark는 워커 노드에 파이썬 프로세스를 실행하고 파이썬이 이해할 수 있는 포맷으로  
+  모든 데이터를 직렬화함
+- 그리고 파이썬 프로세스에 있는 데이터의 로우마다 함수를 실행하고  
+  마지막으로 JVM과 Spark에 처리 결과를 반환
+~~~
+// 파이썬 UDF 처리 과정
+                                      -------> 익스큐터 프로세스 
+                                                     |  ^
+                                    |                v  |
+                                    |         워커 파이썬 프로세스
+드라이버                            | 
+--------------------------          |                           익스큐터 프로세스 
+| 스칼라 UDF |  spark    |--(함수 직렬화 후 워커에 전달)-->         |    ^
+| 파이썬 UDF |  session  |                                          v    |
+--------------------------                                     워커 파이썬 프로세스
+~~~
+#### 파이썬 UDF 실행시 문제점
+- 파이썬 프로세스를 시작하는 부하도 크지만, 진짜 부하는 파이썬으로  
+  데이터를 전달하기 위해 직렬화 하는 과정에서 발생
+- 이 특성은 두 가지 문제점을 발생
+  - 직렬화에 큰 부하가 발생
+  - 데이터가 파이썬으로 전달되면 스파크에서 워커 메모리를 관리할 수 없음
+- 그러므로 JVM과 파이썬이 동일한 머신에서 메모리 경합을 하면 자원에 제약이 생겨  
+  워커가 비정상적으로 종료될 가능성이 있음
+- 결과적으로 Java나 Scala로 함수를 개발하는 것이 좋음
+- UDF를 실행해보자. 먼저 DataFrame에서 사용할 수 있도록 함수를 등록
+~~~scala
+import org.apache.spark.sql.functions.udf
+val power3udf = udf(power3(_:Double):Double)
+~~~
+- 이제 power3 함수를 DataFrame의 다른 함수와 동일한 방법으로 사용할 수 있음
+~~~scala
+udfExampleDF.select(power3df(col("num"))).show()
+~~~
+- 아직까지는 UDF를 DataFrame에서만 사용할 수 있고 문자열 표현식(expr)에서는 사용할 수 없음
+- UDF를 spark SQL 함수로 등록하면 모든 프로그래밍 언어와 SQL에서 UDF를 사용할 수 있음
+~~~scala
+spark.udf.register("power3", power3(_:Double):Double)
+udfExampleDF.selectExpr("power3(num)").show(2)
+~~~
+- 스칼라로 제작한 UDF를 Spark SQL 함수로 등록했기 때문에  
+  python에서 SQL 표현식을 이용해 해당 함수를 사용 가능
+- 파이썬 함수를 SQL 함수로 등록할 수 있음. 즉 다른 언어에서도 동일한 방법으로 사용할 수 있음
+- Spark는 파이썬의 데이터 타입과는 다른 자체 데이터 타입을 사용하기 때문에  
+  함수를 정의할 때 반환 타입을 지정하는 것이 좋음
+- 함수에서 반환될 실제 데이터 타입과 일치하지 않는 데이터 타입을 지정하면  
+  <b>Spark는 오류가 아닌 null값을 발생시킴</b>
+- 다음 예제와 같이 함수의 반환 데이터 타입을 DoubleType으로 변경하면 이러한 현상 확인 가능
+~~~python
+// 파이썬 코드
+from pyspark.sql.types import IntegerType, DoubleType
+spark.udf.register("power3py", power3, DoubleType())
+udfExampleDF.selectExpr("power3py(num)").show(2)
+~~~
+- null값은 반환하는 이유는 range 메서드가 Integer 데이터 타입의 데이터를 만들기 때문
+- 이 문제를 해결하려면 파이썬 함수가 Integer 데이터 타입 대신 Float 데이터 타입을 반환하도록 수정해야 함
+
+### 6.12 Hive UDF
+- 하이브 문법을 사용해서 만든 UDF/UDAF도 사용할 수 있음
+- 이렇게 하려면 SparkSession을 생성할 때 `SparkSession.builder().enableHiveSupport()`를 명시해 하이브 지원 기능을 활성화해야 함
+- 하이브 지원이 활성화되면 SQL로 UDF로 등록 가능
+- 사전에 컴파일된 스칼라와 자바 패키지에서만 지원되므로 라이브러리 의존성을 명시해야 함
