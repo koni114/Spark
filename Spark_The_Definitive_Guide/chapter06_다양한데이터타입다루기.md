@@ -5,7 +5,7 @@
   - 불리언 타입 
   - 수치 타입
   - 문자열 타입
-  - date와 timestampe 타입
+  - date와 timestamp 타입
   - null 값 다루기 
   - 복합 데이터 타입
   - 사용자 정의 함수
@@ -14,7 +14,7 @@
 - spark는 여전히 활발하게 성장하고 있는 프로젝트이므로 , 데이터 변환용 함수를 어떻게 찾는지 알아야 함
 - 데이터 변환용 함수를 찾기 위해 핵심적으로 보아야 할 부분은 다음과 같음
   - DataFrame(Dataset) 메서드  
-    - DataFrameStatFunction 와 DataFrameNaFunctions 등 Dataset의 하위 모듈은 다양한 메서드를 제공
+    - DataFrameStatFunctions 와 DataFrameNaFunctions 등 Dataset의 하위 모듈은 다양한 메서드를 제공
     - DataFrameStatFunctions는 다양한 통계적 함수 제공
     - DataFrameNaFunctions는 null 데이터를 다루는 데 필요한 함수 제공
   - Column 메서드
@@ -107,7 +107,7 @@ WHERE StockCode = 'DOT' and (UnitPrice > 600 OR instr(Description, "POSTAGE") >=
 ~~~scala
 import org.apache.spark.sql.functions.{expr, not, col}
 // dataFrame IF
-df.withColumn("isExpensive", not(col("UnitPrice").leq(250)))
+df.withColumn("isExpensive", not(col("UnitPrice").leq(250))) // Less than or equal to
 .filter("isExpensive")
 .select("Description", "UnitPrice").show(5)
 
@@ -266,12 +266,13 @@ df.withColumn("hasSimpleColor", containsBlack.or(containsWhite))
 .select("Description").show(3, false)
 ~~~
 - 값의 개수가 늘어나면 복잡해짐
-- 동적으로 인수가 변하는 상황을 Spark는 어덯게 처리하는지 알아보자
+- 동적으로 인수가 변하는 상황을 Spark는 어떻게 처리하는지 알아보자
 - 값 목록을 인수로 변환해 함수에 전달할 때는 varargs라 불리는 스칼라 고유 기능을 사용  
   이 기능을 사용해 임의 길이의 배열을 효율적으로 다룰 수 있음
-- `select` 메서드와 `varargs`를 함께 사용해 원하는 만큼 동적으로 컬럼 생성할 수 있음
+- <b>`select` 메서드와 `varargs`를 함께 사용해 원하는 만큼 동적으로 컬럼 생성할 수 있음</b>
 
 ~~~scala
+// 꼭 알아두기!
 val simpleColors = Seq("black", "white", "red", "green", "blue")
 val selectedColumns = simpleColors.map(color => {
     col("Description").contains(color.toUpperCase).alias(s"is_$color")
@@ -299,7 +300,7 @@ df.select(selectedColumns:_*).where(col("is_white").or(col("is_red"))).select("D
 - 그 이상의 정밀도는 `TimestampType`으로 변환될 때 제거
 - Spark는 특정 시점에 데이터 포멧이 약간 특이하게 변할 수 있음  
   이런 문제를 피하려면 파싱이나 변환 작업을 해야함
-- 다음은 오늘 날짜와 타임스탬프 값을 구하는 예제
+- 다음은 오늘 날짜와 타임스탬프 값을 구하는 예제 `current_date`, `current_timestamp` 함수 사용
 ~~~scala
 import org.apache.spark.sql.functions.{current_date, current_timestamp}
 val dateDF = spark.range(10)
@@ -394,7 +395,8 @@ cleanDateDF.filter(col("date2") > "'2017-12-12'").show()
 ~~~
 - 암시적 형변환은 매우 위험함  
   특히 null 값 또는 다른 시간대나 포맷을 가진 날짜 데이터를 다룰 때는 더 위험함
-- 암시적 형변환에 의지하지 말고 명시적으로 데이터 타입을 변환해 사용하자
+- 암시적 형변환에 의지하지 말고 명시적으로 데이터 타입을 변환해 사용하자  
+  --> date format을 반드시 줘서 사용하자는 의미! 
 
 ### 6.7 null 값 다루기
 - Spark에서는 빈 문자열이나 대체 값 대신 null값을 사용해야 최적화를 수행할 수 있음
@@ -403,7 +405,7 @@ cleanDateDF.filter(col("date2") > "'2017-12-12'").show()
 - null 값을 허용하지 않는 컬럼을 선언해도 <b>강제성</b>은 없음  
   즉, null값을 허용하지 않는 컬럼에 null 값을 컬럼에 넣을 수 있다는 얘기
 - 만약 null 값이 없어야 하는 컬럼에 null 값이 존재한다면, 
-  부정확한 결과를 초래하거나 디버깅하기 어려운 특잏나 오류를 만날 수 있음
+  부정확한 결과를 초래하거나 디버깅하기 어려운 오류를 만날 수 있음
 - null 값을 다루는 방법은 두가지가 있음
   - 명시적으로 null 값을 제거
   - 전역 또는 컬럼 단위로 null 값을 특정 값으로 채워 넣기
@@ -730,3 +732,7 @@ udfExampleDF.selectExpr("power3py(num)").show(2)
 - 이렇게 하려면 SparkSession을 생성할 때 `SparkSession.builder().enableHiveSupport()`를 명시해 하이브 지원 기능을 활성화해야 함
 - 하이브 지원이 활성화되면 SQL로 UDF로 등록 가능
 - 사전에 컴파일된 스칼라와 자바 패키지에서만 지원되므로 라이브러리 의존성을 명시해야 함
+
+
+### 용어 정리
+- 인라인 쿼리
