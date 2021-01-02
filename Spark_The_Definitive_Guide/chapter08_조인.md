@@ -150,7 +150,7 @@ person.crossJoin(graduateProgram).show()
 import org.apache.spark.sql functions.expr
 
 person.withColumnRenamed("id", "personId")
-.join(sparkStatus, expr("array_contains(spark_statuss, id)")).show()
+.join(sparkStatus, expr("array_contains(spark_status, id)")).show()
 ~~~
 
 #### 8.11.2 중복 컬럼명 처리
@@ -219,7 +219,7 @@ person.join(gradProgram3, joinExpr).show()
 
 #### 큰 테이블과 큰 테이블 조인
 - 하나의 큰 테이블과 다른 큰 테이블을 조인하면 셔플 조인이 발생   
-[!img]()
+[!img](C:/Spark/Spark_The_Definitive_Guide/imgs/shuffle_join.img)
 - 셔플 조인은 전체 노드간 통신이 발생
 - 그리고 조인에 사용한 특정 키나 키 집합을 어떤 노드가 가졌는지에 따라 해당 노드와 데이터를 공유
 - 이런 통신 방식 때문에 네트워크는 복잡해지고 많은 자원을 사용
@@ -230,7 +230,7 @@ person.join(gradProgram3, joinExpr).show()
 
 #### 큰 테이블과 작은 테이블 조인
 - 테이블이 단일 워커 노드의 메모리 크기에 적합할 정도로 충분히 작은 경우 조인 연산을 최적화 할 수 있음
-- 큰 테이블 사이에 조인에 사용한 방법도 유용하지만 브로트케스트 조인이 훨신 효율적
+- 큰 테이블 사이에 조인에 사용한 방법도 유용하지만 브로드케스트 조인이 훨신 효율적
 - <b>이 방법은 작은 DataFrame을 클러스터의 전체 워커 노드에 복제하는 것을 의미함</b>
 - 이렇게 하면 자원을 많이 사용하는 것처럼 보이지만 조인 프로세스 내내 전체 노드가 통신하는 현상을 막을 수 있음
 - 그림에서와 같이 시작 시 단 한번만 복제가 수행되며 그 이후로는 개별 워커가 다른 워커 노드를 기다리거나 통신할 필요 없이 작업 수행
@@ -243,7 +243,7 @@ person.join(gradProgram3, joinExpr).show()
 val joinExpr = person.col("graduate_program") === graduteProgram.col("id")
 person.join(graduateProgram, joinExpr).explain()
 ~~~
-- DataFrame API를 사용하면 옵티마이저에서 브로드캐스트 조인을 사용할 수 있도록 힌드를 줄 수 있음
+- DataFrame API를 사용하면 옵티마이저에서 브로드캐스트 조인을 사용할 수 있도록 힌트를 줄 수 있음
 - 힌트를 주는 방법은 broadcast 함수에 작은 크기의 DataFrame을 인수로 전달하는 것
 - 다음 예제는 우리가 앞서 보았던 예제와 동일한 실행 계획을 세움. 하지만 항상 동일한 실행 계획을 세우는 것은 아님
 ~~~scala
