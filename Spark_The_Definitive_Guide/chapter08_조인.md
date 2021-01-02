@@ -219,7 +219,7 @@ person.join(gradProgram3, joinExpr).show()
 
 #### 큰 테이블과 큰 테이블 조인
 - 하나의 큰 테이블과 다른 큰 테이블을 조인하면 셔플 조인이 발생   
-[!img](https://github.com/koni114/Spark/blob/main/Spark_The_Definitive_Guide/imgs/shuffle_join.jpg)
+![img](https://github.com/koni114/Spark/blob/main/Spark_The_Definitive_Guide/imgs/shuffle_join.jpg)
 - 셔플 조인은 전체 노드간 통신이 발생
 - 그리고 조인에 사용한 특정 키나 키 집합을 어떤 노드가 가졌는지에 따라 해당 노드와 데이터를 공유
 - 이런 통신 방식 때문에 네트워크는 복잡해지고 많은 자원을 사용
@@ -229,7 +229,7 @@ person.join(gradProgram3, joinExpr).show()
 - DataFrame 1 과 2는 모두 큰 DataFrame 임. 즉 전체 조인 프로세스가 진행되는 동안 모든 워커 노드에서 통신이 발생함을 의미
 
 #### 큰 테이블과 작은 테이블 조인
-[!img](https://github.com/koni114/Spark/blob/main/Spark_The_Definitive_Guide/imgs/broadCast_join.jpg)
+![img](https://github.com/koni114/Spark/blob/main/Spark_The_Definitive_Guide/imgs/broadCast_join.jpg)
 - 테이블이 단일 워커 노드의 메모리 크기에 적합할 정도로 충분히 작은 경우 조인 연산을 최적화 할 수 있음
 - 큰 테이블 사이에 조인에 사용한 방법도 유용하지만 브로드케스트 조인이 훨신 효율적
 - <b>이 방법은 작은 DataFrame을 클러스터의 전체 워커 노드에 복제하는 것을 의미함</b>
