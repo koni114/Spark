@@ -15,6 +15,11 @@ val df = spark.read.format("json")
 #### DataFrame의 스키마 살펴보기
 ~~~scala
 df.printSchema()
+
+root
+ |-- DEST_COUNTRY_NAME: string(nullable = true)
+ |-- ORIGIN_COUNTRY_NAME: string(nullable = true)
+ |-- count: long(nullable = true)
 ~~~
 
 ### 5.1 스키마
@@ -32,9 +37,9 @@ df.printSchema()
 spark.read.format("json").load("C:/Spark-The-Definitive-Guide-master/data/flight-data/json/2015-summary.json").schema
 
 //- 실행 결과
-org.apache.spark.sql.types.StructType = StructType(StructField(DEST_COUNTRY_NAME,StringType,true), 
-                                                   StructField(ORIGIN_COUNTRY_NAME,StringType,true), 
-                                                   StructField(count,LongType,true))
+org.apache.spark.sql.types.StructType = StructType(StructField(DEST_COUNTRY_NAME,StringType,true),    
+           StructField(ORIGIN_COUNTRY_NAME,StringType,true), 
+           StructField(count,LongType,true))
 ~~~
 - 여러 개의 StructField 타입 필드로 구성된 StructType 객체
 - StructField은 (이름, 데이터 타입, 컬럼값 유무(null)) 로 구성
@@ -79,7 +84,7 @@ column("someColumnsName")
 - Scala의 고유 기능을 사용해 더 간단한 방법으로 컬럼을 참조할 수 있음
 ~~~scala
 $"myColumn" // $ 마크 이용
-'myColumn   //- 틱마크 ' 이용
+'myColumn   // 틱마크 ' 이용
 ~~~
 - 컬럼이 DataFrame에 있을지 없을지는 알 수 없음
 - 컬럼은 컬럼명을 <b>카탈로그</b>에 저장된 정보와 비교하기 전까지 <b>미확인</b> 상태로 남음
@@ -256,7 +261,7 @@ SELECT columnName * 10, otherColumn, someOtherCol as c FROM dataFrameTable
 ~~~
 - 즉, DataFrame의 컬럼을 다룰 때 SQL 사용 가능
 - select 메서드를 사용하는 것이 가장 쉬움
-~~~
+~~~scala
 // scala
 df.select("DEST_COUNTRY_NAME").show(2)
 
@@ -402,14 +407,14 @@ set spark.sql.caseSensitive true
 ~~~
 
 #### 5.4.8 컬럼 제거하기
-- select, drop 메소드 사용하여 제거가능
+- `drop` 메소드 사용하여 제거가능
 ~~~scala
 df.drop("ORIGIN_COUNTRY_NAME").columns
 df.drop("ORIGIN_COUNTRY_NAME", "DEST_COUNTRY_NAME")
 ~~~
 
 #### 5.4.9 컬럼의 데이터 타입 변경하기
-- cast 메서드를 통해 변경 가능
+- `cast` 메서드를 통해 변경 가능
 - 다음은 count 컬럼을 Integer 데이터 타입에서 String 데이터 타입으로 형변환하는 예제
 ~~~scala
 df.withColumn("count2", col("count").cast("string"))
@@ -456,8 +461,7 @@ dataFrames(0).count() > dataFrames(1).count()
 ~~~
 
 #### 5.4.14 로우 합치기와 추가하기
-- DataFrame은 불변하므로, 레코드를 합치려면 기존의 DataFrame을 수정하기엔 불가능하며  
-  원본 DataFrame을 새로운 DataFrame과 통합해야함  
+- DataFrame은 불변하므로, 레코드를 합치려면 기존의 DataFrame을 수정하기엔 불가능하며 원본 DataFrame을 새로운 DataFrame과 통합해야함  
 - 통합하려면 두 개의 DataFrame은 반드시 동일한 스키마와 컬럼 수를 가져야 함
 - <b>union 메소드는 컬럼명(스키마) 기반 병합이 아닌, 컬럼 위치를 기반으로 동작</b>
 ~~~scala
@@ -476,21 +480,17 @@ df.union(newDF)
 .where($"ORIGIN_COUNTRY_NAME" =!= "United States")
 .show() // 전체 데이터 조회시, 신규 데이터 확인 가능
 ~~~
-- 스칼라에서는 반드시 =!= 연산자 사용해야 함  
-  컬럼 표현식과 문자열을 비교했을 때, =!= 연산자 사용시 컬럼 표현식($"ORIGIN_COUNTRY_NAME")  
+- 스칼라에서는 반드시 `=!=` 연산자 사용해야 함  
+  컬럼 표현식과 문자열을 비교했을 때, `=!=` 연산자 사용시 컬럼 표현식($"ORIGIN_COUNTRY_NAME")  
   이 아닌 컬럼의 실제값을 비교 대상 문자열(United States)과 비교
-~~~scala
-// 결과
-~~~
 - DataFrame을 View로 만들거나, 테이블로 등록하면 DataFrame의 변경작업과 관계없이  
   동적으로 참조 가능
 
 #### 5.4.15 로우 정렬하기
-- sort와 orderBy 메서드를 이용해 DataFrame 정렬 가능
+- `sort`와 `orderBy` 메서드를 이용해 DataFrame 정렬 가능
 - 두 메서드는 완전히 같은 방식으로 동작함  
   (spark code를 살펴보면 orderBy 메소드에서 sort 메소드 호출)
-- 두 메서드 모두 컬럼 표현식과 문자열을 사용할 수 있음  
-  또한 다수의 컬럼 지정 가능
+- 두 메서드 모두 컬럼 표현식과 문자열을 사용할 수 있음. 또한 다수의 컬럼 지정 가능
 - 기본 동작 방식은 오름차순 정렬
 ~~~scala
 // Scala
