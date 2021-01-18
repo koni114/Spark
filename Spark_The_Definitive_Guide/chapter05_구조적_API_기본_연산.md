@@ -11,7 +11,7 @@
 val df = spark.read.format("json")
     .load("C:/Spark-The-Definitive-Guide-master/data/flight-data/json/2015-summary.json")
 ~~~
-
+  
 #### DataFrame의 스키마 살펴보기
 ~~~scala
 df.printSchema()
