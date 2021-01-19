@@ -255,6 +255,383 @@ DESCRIBE TABLE flights_csv
 SHOW PARTITIONS partitioned_flights
 ~~~
 
+### 테이블 메타데이터 갱신하기
+- 테이블 메타데이터를 유지하는 것은 가장 최신의 데이터셋을 읽고 있다는 것을 보장할 수 있는 중요한 작업
+- 테이블 메타데이터를 갱신할 수 있는 두 가지 명령이 있음
+- `REFRESH TABLE` 구문은 테이블과 관련된 모든 캐싱된 항목을 갱신
+- 테이블이 이미 캐싱되어 있다면 다음번 스캔 동작 시점에 다시 캐싱
+~~~scala
+REFRESH table partitioned flights
+~~~
+- 또 다른 명령은 카탈로그에서 관리하는 테이블 정보를 새로 고치는 `REPAIR TABLE`임
+- 이 명령은 새로운 파티션 정보를 수집하는 데 초점을 맞춤
+- 예를 들어 수동으로 신규 파티션을 만든다면 테이블을 수리(repair) 해야함
+~~~scala
+MSCK REPAIR TABLE partitioned_flights
+~~~
+
+### 테이블 제거하기
+- 테이블은 삭제(delete) 할 수 없음. 오로지 제거(drop)만 가능
+- `DROP` 키워드를 사용해 테이블을 제거
+- 관리형 테이블(flights_csv)을 제거하면 데이터와 테이블 정의 모두 제거됨
+- 테이블을 제거하면 테이블의 데이터가 모두 제거되므로 신중하게 작업해야 함
+~~~scala
+DROP TABLE flights_csv
+~~~
+- 존재하지 않는 테이블을 제거하려면 오류가 발생
+- 테이블이 존재하는 경우에만 제거하려면 `DROP TABLE IF EXISTS` 구문을 사용해야 함
+~~~scala
+DROP TABLE IF EXISTS flights_csv
+~~~
+
+#### 외부 테이블 제거하기
+- 외부 테이블(hive_flights)을 제거하면 데이터는 삭제되지 않지만, 더는 외부 테이블명을 이용해 데이터를 조회할 수 없음
+
+### 테이블 캐싱하기
+- DataFrame에서처럼 테이블을 캐시하거나 캐시에서 제거할 수 있음 
+~~~scala
+CACHE TABLE flights
+~~~
+- 캐시에서 제거하는 방법은 다음과 같음
+~~~scala
+UNCACHE TABLE FLIGHTS
+~~~
+
+## 10.7 뷰
+- 지금까지는 테이블을 생성하는 방법에 대해서 알아봄
+- 이제 뷰를 정의해보자
+- 뷰는 기존 테이블에 여러 트랜스포메이션 작업을 지정함
+- 기본적으로 <b>뷰는 단순 쿼리 실행 계획일 뿐임</b>
+- 뷰를 사용하면 query 로직을 체계화하거나 재사용하기 편하게 만들 수 있음
+- Spark는 View와 관련된 다양한 개념을 가지고 있음. View는 DB에 설정하는 전역 뷰나 세션별 뷰가 될 수 있음
+
+### 뷰 생성하기
+- 최종 사용자에게 뷰는 테이블처럼 보임
+- 신규 경로에 모든 데이터를 다시 저장하는 대신 단순하게 쿼리 시점에 데이터소스에 트랜스포메이션을 수행함
+- `filter`, `select` 또는 대규모 `GROUP BY`, `ROLLUP` 같은 트랜스포메이션이 이에 해당됨
+- 다음은 목적지가 United States인 항공운항 데이터를 위한 뷰를 생성하는 예제
+~~~scala
+CREATE VIEW just_usa_view AS
+SELECT * FROM flights WHERE dest_country_name = 'United States'
+~~~
+- 테이블처럼 DB에 등록되지 않고 현재 세션에서만 사용할 수 있는 임시 뷰를 만들 수 있음 --> `CREATE TEMP VIEW`
+~~~scala
+CREATE TEMP VIEW just_usa_view_temp AS
+SELECT * FROM flights WHERE dest_country_name = 'United States'
+~~~
+- 전역적 임시 뷰(global temp view)도 만들 수 있음
+- 전역적 임시 뷰는 DB에 상관없이 사용할 수 있으므로 전체 스파크 애플리케이션에서 볼 수 있음
+- 하지만 세션이 사라지면 View도 사라짐
+~~~scala
+CREATE GLOBAL TEMP VIEW just_usa_view_temp AS
+SELECT * FROM flights WHERE dest_country_name = 'United States'
+
+SHOW TABLES
+~~~
+- 다음 예제에 나오는 키워드를 사용해 생성된 뷰를 덮어쓸 수 있음
+- 임시 뷰와 일반 뷰 모두 덮어쓸 수 잇음  --> (`REPLACE TEMP VIEW`)
+~~~scala
+CREATE OR REPLACE TEMP VIEW just_usa_view_temp AS
+SELECT * FROM flights WHERE dest_country_name = 'United States'
+~~~
+- 이제 다른 테이블과 동일한 방식으로 뷰를 사용할 수 있음
+~~~scala
+SELECT * FORM just_usa_view_temp
+~~~
+- View는 실질적으로 트랜스포메이션이며 Spark는 쿼리가 실행될 때만 뷰에 정의된 트랜스포메이션을 수행함
+- 즉, 테이블의 데이터를 실제로 조회하는 경우에만 필터를 적용
+- 사실 뷰는 기존 DataFrame에서 새로운 DataFrame을 만드는 것과 동일
+- 스파크 DataFrame과 Spark SQL로 생성된 쿼리 실행 계획을 비교해 확인할 수 있음
+- DataFrame 에서는 다음 코드를 사용
+~~~scala
+val flights = spark.read.format("json")
+.load("/data/flight-data/json/2015-summary.json")
+val just_usa_df = flights.where("dest_country_name" = 'United States')
+just_usa_df.selectExpr("*").explain
+~~~
+- SQL 사용 시 다음과 같은 쿼리 실행
+~~~scala
+EXPLIAN SELECT * FROM just_usa_view
+~~~
+- 다음 쿼리를 사용할 수도 있음
+~~~scala
+EXPLAIN SELECT * FROM flights WHERE dest_country_name = 'United States'
+~~~
+- 따라서 DataFrame이나 SQL 중 가장 편한 방법을 선택해서 사용하면 됨
+
+### 뷰 제거하기
+- 테이블을 제거하는 것과 동일한 방식으로 뷰를 제거할 수 있음
+- 단지 제거하라는 대상을 테이블이 아닌 View로 지정하기만 하면 됨
+- View는 Table과 달리 단지 뷰 정의만 제거됨
+~~~scala
+DROP VIEW IF EXISTS just_usa_view;
+~~~
+
+## 10.8 데이터베이스
+- 데이터베이는 여러 테이블을 조직화하기 위한 도구
+- 앞서 언급했듯이 데이터베이스를 정의하지 않으면 스파크는 기본 데이터베이스를 사용
+- 스파크에서 실행하는 모든 SQL 명령문은 사용 중인 데이터베이스 범위에서 실행
+- 즉 데이터베이스를 변경하면 이전에 생성한 모든 사용자 테이블이 변경하기 전의 데이터베이스에 속해 있으므로 기존 테이블 데이터를 조회하려면 다르게 쿼리해야 함  
+(쿼리에서 테이블 이름 앞에 데이터베이스 이름을 붙이는 방식을 사용할 수 있음)
+- 특히 동료와 동일한 컨텍스트나 세션을 공유하는 경우 혼란을 일으킬 수 있으므로 사용할 데이터베이스를 반드시 설정해야 함
+- 다음 명령을 이용해 전체 데이터베이스 목록을 확인할 수 있음
+~~~scala
+SHOW DATABASES
+~~~
+
+## 데이터베이스 생성하기
+- 데이터베이스를 생성하는 방법은 다른 예제에서 사용한 방식과 동일한 패턴을 따름 
+- 다만 `CREATE DATABASE` 사용
+~~~scala
+CREATE DATABASE some_db
+~~~
+
+## 데이터베이스 설정하기
+- `USE` 키워드 다음에 데이터베이스명을 붙여서 쿼리 수행에 필요한 데이터베이스를 설정할 수 있음
+~~~scala
+USE some_db
+~~~ 
+- 모든 쿼리는 테이블 이름을 찾을 때 앞서 지정한 데이터베이스를 참조함
+- 하지만 다른 데이터베이스를 지정했기 때문에 정상 작동하던 쿼리가 실패하거나 다른 결과를 반환할 수 있음
+~~~scala
+SHOW tables
+SELECT * FROM flights --  테이블이나 뷰를 찾을 수 없으므로 에러 발생
+~~~
+- 그러나 올바른 접두사를 사용해 다른 데이터베이스의 테이블에 쿼리 수행 가능
+~~~scala
+SELECT * FROM default.flights
+~~~
+- 다음 명령을 사용해 현재 어떤 DB를 사용 중인지 확인 가능
+~~~scala
+SELECT current_database()
+~~~ 
+
+### 10.8.3 데이터베이스 제거하기
+- 데이터베이스를 삭제하거나 제거하는 것도 마찬가지로 쉬움
+- `DROP DATABASE` 키워드를 사용하기만 하면 됨
+~~~scala
+DROP DATABASE IF EXISTS some_db;
+~~~
+
+## 10.9 select 구문
+- Spark 쿼리는 다음과 같이 ANSI-SQL 요건을 충족함
+- 또한 SELECT 표현식의 구조를 확인할 수 있음
+~~~scala
+SELECT [ALL|DISTINCT] named_expression[, named_expression, ...]
+    FROM relation[, relation, ...]
+    [lateral_view[, lateral_view, ...]]
+    [WHERE boolean_expression]
+    [aggregation [HAVING boolean_expression]]
+    [ORDER BY sort_expressions]
+    [CLUSTER BY expressions]
+    [DISTRIBUTE BY expressions]
+    [SORT BY sort_expressions]
+    [WINDOW named_window[, WINDOW named_window, ...]]
+    [LIMIT num_rows]
+
+named_expression:
+    : expression [AS alias]
+
+relation:
+    | join_relation
+    | (table_name|query|relation) [sample] [AS alias]
+    : VALUES (expressions)[, (expressions), ...]
+          [AS (column_name[, column_name, ...])]
+
+expressions:
+    : expression[, expression, ...]
+
+sort_expressions:
+    : expression [ASC|DESC][, expression [ASC|DESC], ...]
+~~~
+
+### 10.9.1 case...when...then 구문
+- SQL 쿼리의 값을 조건에 맞게 변경해야 할 수도 있음
+- `case...when...then...end` 구문을 사용해 조건에 맞는 처리를 할 수 있음
+- 이 구문은 프로그래밍의 if 구문과 동일한 처리를 함
+~~~scala
+SELECT
+    CASE WHEN DEST_COUNTRY_NAME = 'UNITED STATES' THEN 1
+         WHEN DEST_COUNTRY_NAME = 'Egypt' THEN 0
+         ELSE -1 END
+FROM partitioned_flights
+~~~
+
+## 10.10 고급 주제
+- 지금까지 데이터가 어디에 존재하는지, 어떻게 구성해야 하는지 알아보았음
+- 이제 데이터를  쿼리하는 방법을 알아보겠음
+- SQL 쿼리는 특정 명령 집합을 실행하도록 요청하는 SQL 구문
+- SQL 구문은 조작, 정의 제어와 관련된 명령을 정의할 수 있음
+- 이 책에서는 대부분 조작과 관련된 내용을 다룸
+
+### 10.10.1 복합 데이터 타입
+- 복합 데이터 타입은 표준 SQL과는 거리가 있으며 표준 SQL에서는 존재하지 않는 매우 강력한 기능
+- 이를 SQL에서 어떻게 적절하게 처리하는지 이해할 필요가 있음
+- Spark SQL에는 구조체, 리스트, 맵 세 가지 핵심 복합 데이터 타입이 존재
+
+#### 구조체
+- 구조체는 맵에 더 가까우며, Spark에서 중첩 데이터를 생성하거나 쿼리하는 방법을 제공
+- 구조체를 만들기 위해서는 여러 컬럼이나 표현식을 괄호로 묶기만 하면 됨
+~~~scala
+CREATE VIEW IF NOT EXISTS nested_data AS
+SELECT (DEST_COUNTRY_NAME, ORIGIN_COUNTRY_NAME) as country, count FROM flights
+~~~
+- 이제 다음과 같은 방법을 사용해 구조체 데이터를 조회할 수 있음
+~~~scala
+SELECT * FROM nested_data
+~~~
+- 구조체의 개별 컬럼을 조회할 수도 있음. 점(dot)을 사용하기만 하면 됨
+~~~scala
+SELECT country.DEST_COUNTRY_NAME, count FROM nested_data
+~~~
+- 구조체의 이름과 모든 하위 컬럼을 지정해 모든 값을 조회할 수 있음
+- 진짜 하위 컬럼은 아니지만 모든 것을 마치 하위 컬럼처럼 다룰 수 있기 때문에 다음과 같이 더 간단한 방법을 사용할 수도 있음
+~~~scala
+SELECT country.*, count FROM nested_data
+~~~
+
+#### 리스트
+- 프로그래밍 언어의 리스트에 익숙하다면 Spark SQL의 리스트도 어색하지 않을 것임
+- 값의 배열이나 리스트는 여러 가지 방법으로 생성할 수 있음
+- 값의 리스트를 만드는 `collect_list` 함수나 중복 값이 없는 배열을 만드는 `collect_set` 함수를 사용할 수 있음
+- 두 함수 모두 집계 함수이므로 집계 연산 시에만 사용할 수 있음
+~~~scala
+SELECT DEST_COUNTRY_NAME as new_name, collect_list(count) as flight_counts,
+collect_set(ORIGIN_COUNTRY_NAME) as origin_set
+FROM flights GROUP BY DEST_COUNTRY_NAME
+~~~
+- 다음 예제처럼 컬럼에 직접 배열을 생성할 수 있음
+~~~scala
+SELECT DEST_COUNTRY_NAME, ARRAY(1, 2, 3) fROM flights
+~~~
+- 파이썬 방식과 유사한 배열 쿼리 구문을 사용해 리스트의 특정 위치 데이터를 쿼리할 수 있음
+~~~scala
+SELECT DEST_COUNTRY_NAME as new_name, collect_list(count)[0]
+FROM flights GROUP BY DEST_COUNTRY_NAME
+~~~
+- `explode` 함수를 사용해 배열을 다시 여러 로우로 변환할 수 있음
+- 예제를 위해 이전 쿼리를 이용해 신규 뷰를 먼저 생성
+~~~scala
+CREATE OR REPLACE TEMP VIEW flights_agg AS
+SELECT DEST_COUNTRY_NAME, collect_list(count) as collected_counts
+FROM flights GROUP BY DEST_COUNTRY_NAME
+~~~
+- 복합 데이터 타입 컬럼에 `explode` 함수를 사용해 저장된 배열의 모든 값을 단일 로우 형태로 분해함
+- DEST_COUNTRY_NAME은 배열의 모든 값에 중복되어 표시
+- `explode` 함수는 `collect` 함수와는 정확히 반대로 동작하기 때문에 `collect`함수 실행 전 DataFrame과 동일한 결과 반환
+~~~scala
+SELECT explode(collected_counts), DEST_COUNTRY_NAME FROM flights_agg
+~~~
+
+### 10.10.2 함수
+- Spark SQL은 복합 데이터 타입 외에도 다양한 고급 함수를 제공
+- DataFrame 함수 문서에서 모든 함수를 찾아볼 수 있음
+- 그러나 SQL에서도 이러한 함수를 찾는 방법이 있음. Spark SQL이 제공하는 전체 함수 목록을 확인하려면 `SHOW FUNCTIONS` 구문을 사용
+~~~scala
+SHOW FUNCTIONS
+~~~
+- Spark에 내장된 시스템 함수나 사용자 함수 중 어떤 유형의 목록을 보고 싶은지 명확하게 지정할 수도 있음 
+~~~scala
+SHOW SYSTEM FUNCTIONS
+~~~
+- 사용자 함수는 누군가가 스파크 환경에 공개한 함수
+- 이전에 설명한 사용자 정의 함수와 동일함. 사용자 정의 함수를 만드는 방법은 다음 절에서 자세히 알아보자
+~~~scala
+SHOW USER FUNCTIONS
+~~~
+- 모든 SHOW 명령에 와일드카드 문자(*)가 포함된 문자열을 사용하여 결과를 필터링할 수 있음
+- 예를 들어 's'로 시작하는 모든 함수를 필터링하는 방법은 다음과 같음
+~~~scala
+SHOW FUNCTIONS "s*"
+~~~
+- `LIKE` 키워드를 선택적으로 사용 가능
+~~~scala
+SHOW FUNCTIONS LIKE "collect*"
+~~~
+- 함수 목록을 확인하는 것은 매우 유용. 개별 함수에 대해 더 자세히 알고 싶다면 `DESCRIBE` 키워드 사용. `DESCRIBE` 키워드는 함수 설명과 사용법 반환  
+(DESCRIBE FUNCTION<함수명> 형식으로 사용)
+
+#### 사용자 정의 함수
+- 스파크는 사용자 정의 함수를 정의하고 분산 환경에서 사용할 수 있는 기능 제공
+- 특정 언어를 사용해 함수를 개발한 다음 등록하여 함수를 정의
+~~~scala
+def power3(number:Double):Double = number * number * number
+spark.udf.register("power3", power3(_:Double):Double)
+
+SELECT count, power3(count) FROM flights
+~~~
+- 하이브의 `CREATE TEMPORARY FUNCTION` 구문을 사용해 함수로 등록할 수도 있음
+
+### 10.10.3 서브쿼리
+- 서브쿼리(subquery)를 사용하면 쿼리 안에 쿼리를 지정할 수 있음
+- 이 기능을 사용하면 SQL에서 정교한 로직을 명시할 수 있음. Spark에는 두 가지 기본 서브쿼리가 있음. <b>상호연관 서브쿼리(correlated subquery)</b>는 서브쿼리의 정보를 보완하기 위해 쿼리의 외부 범위에 있는 일부 정보를 사용할 수 있음
+- <b>비상호연관 서브쿼리(uncorrelated subquery)</b>는 외부 범위에 있는 정보를 사용하지 않음
+- 이러한 쿼리 모두 하나 이상의 결과를 반환할 수 있음
+- Spark는 값에 따라 필터링할 수 있는 <b>조건절 서브쿼리(predicate subquery)</b>도 지원
+
+#### 비상호연관 조건절 서브쿼리(uncorrelated predicate subquery)
+- 예제는 두 개의 비상호연관 쿼리로 구성되어 있음
+- 첫 번째 비상호연관 쿼리는 데이터 중 상위 5개의 목적지 국가 정보를 조회
+~~~scala
+SELECT dest_country_name FROM flights
+GROUP BY dest_country_name ORDER BY sum(count) DESC LIMIT 5
+~~~
+- 이제 서브쿼리를 필터 내부의 배치하고 이전 예제의 결과에 출발지 국가 정보가 존재하는지 확인할 수 있음
+~~~scala
+SELECT * FROM flights
+WHERE origin_country_name IN (SELECT dest_country_name FROM flights
+GROUP BY dest_country_name ORDER BY sum(count) DESC LIMIT 5)
+~~~
+- 이 쿼리는 쿼리의 외부 범위에 있는 어떤 관련 정보도 사용하고 있지 않으므로 비상호연관 관계
+- 이러한 쿼리는 독자적으로 사용 가능
+
+#### 상호연관 조건절 서브쿼리(correlated predicate subquery)
+- 내부 쿼리에서 외부 범위에 있는 정보 사용 가능
+- 예를 들어 목적지 국가에서 되돌아올 수 있는 항공편이 있는지 알고 싶다면 목적지 국가를 출발지 국가로, 출발지 국가를 목적지 국가로 하여 항공편이 있는지 확인
+~~~scala
+SELECT * FROM flights f1
+WHERE EXISTS (SELECT 1 FROM flights f2
+              WHERE f1.dest_country_name = f2.origin_country_name)
+AND EXISTS (SELECT 1 FROM flights f2
+             WHERE f2.dest_country_name = f1.origin_country_name)
+~~~
+- `EXISTS` 키워드는 서브쿼리에 값이 존재하면 true를 반환. 앞에 NOT 연산자를 붙여 결과를 뒤집을 수도 있음
+- 만약 NOT 연산자를 사용했다면 돌아올 수 없는 목적지로 가는 항공편 정보 반환
+
+#### 비상호연관 스칼라 쿼리
+- 비상호연관 스칼라 쿼리를 사용하면 기존에 없던 일부 부가 정보를 가져올 수 있음
+- 예를 들어 데이터셋 `count` 컬럼의 최댓값을 결과에 포함하고 싶은 경우 다음과 같은 쿼리 사용 가능
+~~~scala
+SELECT *, (SELECT max(count) FROM flights) AS maximum FROM flights
+~~~
+
+## 10.11 다양한 기능
+- Spark SQL에는 지금까지 알아본 내용과 잘 들어맞지 않는 몇 가지 특징이 존재
+- SQL 코드 성능 최적화나 디버깅이 필요한 경우 이러한 내용이 관련될 수 있음
+
+### 10.11.1 설정
+- 하단에서 나열한 것처럼 Spark SQL 애플리케이션과 관련된 몇 가지 환경 설정값이 있음
+- 이러한 설정값은 셔플 파티션 수를 조정하는 것처럼 애플리케이션 초기화 시점이나 애플리케이션 실행 시점에 설정 가능
+  - spark.sql.inMemoryColumnarStorage.compressed
+    - 이 값을 true로 설정하면 Spark SQL은 데이터 통계를 기반으로 컬럼에 대한 압축 코덱을 자동으로 선택
+  - spark.sql.inMemoryColumnarStorage.batchSize
+    - 컬럼 기반의 캐싱에 대한 배치 크기 조절  
+    - 배치 크기가 클수록 메모리 사용량과 압축 성능 향상되지만,  
+      데이터 캐싱 시 OutOfMemoryError(OOM)가 발생할 위험이 있음
+  - spark.sql.files.maxPartitionBytes  
+    - 파일을 읽을 때 단일 파티션에 할당할 수 있는 최대 바이트수를 정의
+  - spark.sql.files.openCostInBytes
+    - 동시에 스캔할 수 있는 바이트 수  
+      파일을 여는 데 드는 예상 비용을 측정하는데 사용  
+      이 값은 다수의 파일을 파티션에 넣을 때 사용됨  
+      작은 파일을 많이 가진 파티션이 더 큰 파일을 가진 파티션보다 더 좋은 성능을 낼 수 있도록 넉넉한 값을 설정하는 편이 좋음
+  - spark.sql.broadcasTimeout  
+    - 브로드캐스트 조인시 전체 워커 노드로 전파할 때 기다릴 최대 시간을 초 단위로 정의
+  - spark.sql.autoBroadcastJoinThreshold
+    - 조인 시 전체 워커 노드로 전파될 테이블의 최대 크기를 바이트 단위로 설정  
+      이 값을 -1로 설정하면 브로드캐스트 조인을 비활성화  
+  - spark.sql.shuffle.partitions  
+    - 조인이나 집계 수행에 필요한 데이터를 셔플링할 때 사용할 파티션 수를 설정
 
 
 ## 용어 정리
