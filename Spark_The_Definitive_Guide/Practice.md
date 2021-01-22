@@ -1,7 +1,7 @@
 # Practice
 ## chatper05 - 구조적 API 기본 연산
 1. `C:/Spark-The-Definitive-Guide-master/data/flight-data/json` 의 경로에 있는  
-  2015-summary.json file을 loading해 df에 저장하세요
+  2015-summary.json file을 loading해 df에 저장
 2. 1번 데이터의 데이터 스키마를 확인하세요
 3. 1번 데이터에서 DataFrame에 직접 스키마를 만들고 적용해 보세요
 4. 직접 `Seq`와 `Row`를 이용해서 dataFrame 을 생성해보세요  
