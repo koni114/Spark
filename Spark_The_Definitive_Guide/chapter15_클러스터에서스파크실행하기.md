@@ -84,6 +84,9 @@
 - [그림 15-2]는 하나의 워커 노드에 Spark 드라이버를 할당하고 다른 워커 노드에 익스큐터를 할당하는 모습을 나타냄
 - 주로 개발과정에서 대화형 디버깅(Spark shell)을 할 때 사용
  
+ ![img](https://github.com/koni114/Spark/blob/main/Spark_The_Definitive_Guide/imgs/Spark_clientMode.jpg)
+
+
 #### 로컬 모드
 - 로컬 모드는 앞서 알아본 두 모드가 상당히 다름
 - 로컬 모드로 설정된 경우 <b>모든 스파크 애플리케이션은 단일 머신에서 실행</b>됨
@@ -110,7 +113,7 @@
 - 클러스터 매니저는 이 요청을 받아드리고 클러스터 노드 중 하나에 드라이버 프로세스를 실행
 - Spark 잡을 제출한 클라이언트 프로세스는 종료되고 에플리케이션은 클러스터에서 실행됨
 
-![img](https://github.com/koni114/Spark/blob/main/Spark_The_Definitive_Guide/imgs/Spark_driverExecute.jpg)
+![img](https://github.com/koni114/Spark/blob/main/Spark_The_Definitive_Guide/imgs/Spark_requirement.jpg)
 
 - Spark 애플리케이션을 제출하기 위해 터미널에서 다음과 같은 형태의 명령 실행
 ~~~

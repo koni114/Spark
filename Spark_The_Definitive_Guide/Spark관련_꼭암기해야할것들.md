@@ -116,7 +116,33 @@
   - `repartition` : 무조건 전체 데이터 셔플, 향후 사용할 파티션 수가 많을 때 사용
   -  `coalesce` : 전체 데이터를 셔플하지 않고 데이터를 병합하는 경우 사용. 파티션 수를 줄일 때 사용
 - 드라이버로 데이터를 모으려면 `collect`, `toLocalIterator`, `take` 등을 사용. 이때 너무 큰 데이터를 모으는 경우, 비정상적으로 종료될 수 있음
-- 
+
+## chapter15
+- driver는 cluster에서 실행 중인 application 상태를 유지(SparkSession..?)
+- driver는 spark application을 제어, cluster 상태 정보 유지
+- driver는 executor 실행을 위한 클러스터 매니저와 네트워크 및 물리적 컴퓨팅 자원 확보
+- executor는 실행 결과를 driver에게 보고
+- 클러스터 매니저는 spark application 을 실행할 물리적 머신을 유지
+- 클러스터 매니저는 드라이버(= 마스터)와 워커라는 개념을 가지고 있으며, <b>프로세스가 아닌 물리적 머신과 연결되는 개념임</b> 
+- spark application이 실행되지 않고 있는 클러스터 구성에 대한 이해 필요
+  - Master 노드는 개별 워커 노드를 실행 관리하는 데몬 프로세스가 있음
+- 실행 모드는 application을 실행할 때 요청한 자원의 물리적인 위치를 결정  
+  크게 client mode, clutser mode, local mode
+- 클러스터 모드는 가장 흔한 방식이며 컴파일된 JAR 파일, R/Python Script를 클러스터에게 전달해야 함
+- 클러스터는 파일을 받은 다음 워커 노드에 driver/executor process 실행
+- 클러스터에서 Spark Application을 실행할 때 수행되는 단계  
+  - client가 spark-submit을 통해 application을 제출
+  - spark-submit은 드라이버 프로그램 실행. 사용자가 정의한 main 함수 실행
+  - 드라이버 프로그램은 클러스터 매니저에게 executor 실행을 위한 리소스 요청
+  - 클러스터 매니저는 드라이버 프로그램을 대신해 executor 실행
+  - 드라이버는 program에 작성된 RDD의 트랜스포메이션, 액션 기반의 작업 내역(Job)을 태스크로 나눠 executor에게 전달
+  - 단위 작업들은 executor들에 의해 실행되고 결과를 다시 driver에게 전달
+  - driver의 main이 종료되거나, SparkContext.Stop()이 수행되면 executor들은 중지되고 자원들은 다시 반환됨
+- <b>꼭 기억해야 할 것은 driver/executor process가 전부 worker node에서 실행된다는 것</b> 
+- 클라이언트 모드에는 driver process가 client 머신에 존재  
+  클라이언트 모드 수행시, Spark Application을 실행했던 콘솔을 닫아버리거나 기타 다른 방법으로 client process를 종료시키면  
+  Spark Context도 같이 종료되면서 Spark Job이 종료
+- 로컬모드로 설정된 경우 단일 머신에서 spark application이 실행됨
 
 ## Methods, function 
 - `spark.sql` : SQL 쿼리 실행
