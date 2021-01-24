@@ -249,9 +249,9 @@ target/scala-2.11/example_2.11-0.1_SNAPSHOT.jar "hello"
 
 - 특정 배포 환경에서 사용할 수 있는 설정은 다음과 같음
 
-![img](C:/Spark/Spark_The_Definitive_Guide/imgs/clusterManager1.jpg)
+![img](https://github.com/koni114/Spark/blob/main/Spark_The_Definitive_Guide/imgs/clusterManager1.jpg)
 
-![img](C:/Spark/Spark_The_Definitive_Guide/imgs/clusterManager2.jpg)
+![img](https://github.com/koni114/Spark/blob/main/Spark_The_Definitive_Guide/imgs/clusterManager2.jpg)
 
 ### 16.4.1 애플리케이션 시작 예제
 - 이제 앞서 언급한 옵션을 어떻게 사용하는지 알아보겠음
@@ -340,9 +340,9 @@ val conf = new SparkConf().setMaster("local[2]").setAppName("DefinitiveGuide").s
 - 애플리케이션의 속성은 기본 애플리케이션 메타데이터와 일부 실행 특성을 정의함
 - 다음은 애플리케이션 속성 목록
 
-![img](C:/Spark/Spark_The_Definitive_Guide/imgs/appConf1.jpg)
+![img](https://github.com/koni114/Spark/blob/main/Spark_The_Definitive_Guide/imgs/appConf1.jpg)
 
-![img](C:/Spark/Spark_The_Definitive_Guide/imgs/appConf2.jpg)
+![img](https://github.com/koni114/Spark/blob/main/Spark_The_Definitive_Guide/imgs/appConf2.jpg)
 
 - 드라이버가 실행된 호스트의 4040 포트로 접속한 후 SparkUI의 "Environment" 탭을 확인해 값이 올바르게 설정되었는지 확인할 수 있음
 - 사용자가 설정하지 않은 다른 모든 속성은 기본값을 사용

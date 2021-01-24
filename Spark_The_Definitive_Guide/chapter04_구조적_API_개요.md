@@ -159,3 +159,9 @@ val b = ByteType
         0나누기 오류  
         Null참조 오류 
         메모리 부족 오류
+- 반정형 데이터
+  - schema, metaData는 존재하지만 연산은 불가능한 데이터를 반정형 데이터라고 함  
+    예를 들어 Log, XML, JSON과 같은 데이터가 있음
+- schema-on-read
+  - 데이터의 스키마 파악을 읽는 시점에 한다는 뜻
+  - 반대 개념으로는 schema-on-write 가 있음

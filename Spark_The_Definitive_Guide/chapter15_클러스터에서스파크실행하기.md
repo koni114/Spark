@@ -36,7 +36,7 @@
 - 그림 왼쪽에 있는 머신은 클러스터 매니저의 드라이버 노드임. 원은 개별 워커 노드를 실행하고 관리하는 데몬 프로세스
 - <b>그림에서 Spark 애플리케이션은 아직 실행되지 않음. 표시된 원들은 클러스터 매니저의 프로세스 일 뿐!</b>
 
-![img](C:/Spark/Spark_The_Definitive_Guide/imgs/cluster_manager.jpg)
+![img](https://github.com/koni114/Spark/blob/main/Spark_The_Definitive_Guide/imgs/cluster_manager.jpg)
 
 - Spark 애플리케이션을 실제로 실행할 때가 되면 우리는 클러스터 매니저에 자원 할당 요청
 - 사용자 애플리케이션 설정에 따라 스파크 드라이버를 실행할 자원을 포함해 요청하거나 Spark 애플리케이션 실행을 위한 엑스큐터 자원을 요청할 수 있음
@@ -71,7 +71,7 @@
   - 단위 작업들은 결과를 계산하고 저장하기 위해 executor들에 의해 실행
   - driver의 main()이 끝나거나 SparkContext.stop()이 호출된다면 executor들은 중지되고 클러스터 매니저에 사용했던 자원 반환
 
-![img](C:/Spark/Spark_The_Definitive_Guide/imgs/Spark_clutserMode.jpg)
+![img](https://github.com/koni114/Spark/blob/main/Spark_The_Definitive_Guide/imgs/Spark_clutserMode.jpg)
 
 #### 클라이언트 모드
 - 클라이언트 모드는 <b>애플리케이션을 제출한 클라이언트 머신에 Spark 드라이버가 위치</b>한다는 것을 제외하면 클러스터 모드와 동일
@@ -110,7 +110,7 @@
 - 클러스터 매니저는 이 요청을 받아드리고 클러스터 노드 중 하나에 드라이버 프로세스를 실행
 - Spark 잡을 제출한 클라이언트 프로세스는 종료되고 에플리케이션은 클러스터에서 실행됨
 
-![img](C:/Spark/Spark_The_Definitive_Guide/imgs/Spark_driverExecute.jpg)
+![img](https://github.com/koni114/Spark/blob/main/Spark_The_Definitive_Guide/imgs/Spark_driverExecute.jpg)
 
 - Spark 애플리케이션을 제출하기 위해 터미널에서 다음과 같은 형태의 명령 실행
 ~~~
@@ -133,7 +133,7 @@
 - 모든 작업이 정상적으로 완료되면 '스파크 클러스터'가 완성됨
 
 [그림 15-5]  
-![img](C:/Spark/Spark_The_Definitive_Guide/imgs/Spark_start.jpg)
+![img](https://github.com/koni114/Spark/blob/main/Spark_The_Definitive_Guide/imgs/Spark_start.jpg)
 
 ### 15.2.3 실행
 - '스파크 클러스터'가 생성되었으므로 [그림 15-6]과 같이 코드 실행
@@ -142,14 +142,14 @@
 - 태스크를 할당받은 워커는 태스크의 상태와 성공/실패 여부를 드라이버에 전송함
 - 이와 관련된 내용은 잠시 후에 자세히 알아보자
 
-![img](C:/Spark/Spark_The_Definitive_Guide/imgs/Spark_execution.jpg)
+![img](https://github.com/koni114/Spark/blob/main/Spark_The_Definitive_Guide/imgs/Spark_execution.jpg)
 
 ### 15.2.4 완료
 - Spark 애플리케이션의 실행이 완료되면 드라이버 프로세스가 성공이나 실패 중 하나의 상태로 종료됨
 - 그런 다음 클러스터 매니저는 드라이버가 속한 Spark 클러스터의 모든 익스큐터를 종료시킴
 - 이 시점에 Spark 애플리케이션의 성공/실패 여부를 클러스터 매니저에 요청해 확인할 수 있음
 
-![img](C:/Spark/Spark_The_Definitive_Guide/imgs/Spark_end.jpg)
+![img](https://github.com/koni114/Spark/blob/main/Spark_The_Definitive_Guide/imgs/Spark_end.jpg)
 
 ## 15.3 스파크 애플리케이션의 생애주기(스파크 내부)
 - 지금까지는 클러스터 관점(Spark를 지원하는 인프라 관점)에서 스파크 애플리케이션의 생애주기를 알아봄

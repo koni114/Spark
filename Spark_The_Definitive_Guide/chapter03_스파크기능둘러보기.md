@@ -97,7 +97,7 @@ flights
 val staticDataFrame = spark.read.format("csv")
 .option("header", "true")
 .option("inferSchema", "true")
-.load("C:\Spark-The-Definitive-Guide-master\data\retail-data\by-day\*.csv")
+.load("C:/Spark-The-Definitive-Guide-master/data/retail-data/by-day/*.csv")
 
 // 2- table 생성
 staticDataFrame.createOrReplaceTempView("retail_data")
@@ -172,7 +172,7 @@ val purchaseByCustomerPerHour = streamingDataFrame
 purchaseByCustomerPerHour.writeStream
 .format("memory")                // memory = 인메모리 테이블에 저장
 .queryName("customer_purchases") // 인메모리에 저장될 테이블명
-.outputsMode("complete")         // complete = 모든 카운트 수행 결과를 테이블에 저장
+.outputMode("complete")         // complete = 모든 카운트 수행 결과를 테이블에 저장
 .start()
 ~~~
 - 스트림이 시작되면 쿼리 실행 결과가 어떠한 형태로 인메모리 테이블에 기록되는지 확인할 수 있음
@@ -180,7 +180,7 @@ purchaseByCustomerPerHour.writeStream
 // scala
 spark.sql("""
 SELECT *
-FROM custome_purchases
+FROM customer_purchases
 ORDER BY 'sum(total_cost)' DESC
 """)
 .show(5)
@@ -212,7 +212,7 @@ staticDataframe.printSchema()
 - 몇가지 DataFrame의 트랜스포메이션을 사용해 날짜 데이터를 다루는 예제
 ~~~scala
 // Scala
-import org.apache.spark.sql.functions.data_format
+import org.apache.spark.sql.functions.date_format
 
 // 1- 요일 추출
 // 2-  partition 개수 조정 --> 5 (파티션 조정 시 shuffle 사용 안함)
@@ -227,9 +227,9 @@ val preppendDataFrame = staticDataFrame
 ~~~scala
 // Scala
 val trainDataFrame = preppendDataFrame
-.where("InvoiceDate < 2011-07-11")
+.where("InvoiceDate < '2011-07-11'")
 val testDataFrame = preppendDataFrame
-.where("InvoiceDate >= 2011-07-11")
+.where("InvoiceDate >= '2011-07-11'")
 
 trainDataFrame.count()
 testDataFrame.count()
@@ -266,7 +266,7 @@ import org.apache.spark.ml.Pipeline
 
 // pipeLine 설정
 val transformationPipeline = new Pipeline()
-.setStages(Array(indexer, encoder, vectorAssembler))
+.setStages(Array(indexer, encoder, VectorAssembler))
 ~~~
 - 학습 준비 과정을 2단계로 이루어짐
   - transformer를 데이터셋에 적합(fit)
@@ -277,7 +277,7 @@ val transformationPipeline = new Pipeline()
 val fittedPipeline = transformationPipeline.fit(trainDataFrame)
 
 // 데이터 변환
-val trainsformedTraining = fittedPipeline.transform(trainDataFrame)
+val transformedTraining = fittedPipeline.transform(trainDataFrame)
 ~~~
 - 동일한 트랜스포메이션을 계속 반복할 수 없으므로,  
   그 대신 모델에 일부 hyper-parameter 튜닝값을 적용
@@ -374,4 +374,4 @@ sparkDF <- read.df("/data/flight-data/csv/2015-summary.csv",
 - RDD(Resilient Distributed DataSet)
   - 여러 분산 노드에 걸쳐서 저장되는 변경이 불가능한 데이타(객체)의 집합
   - 각각의 RDD는 여러개의 파티션으로 분리가 됨
-  - 쉽게 말하면 Spark에서 사용되는 Data가 SDD
+  - 쉽게 말하면 Spark에서 사용되는 Data가 RDD
