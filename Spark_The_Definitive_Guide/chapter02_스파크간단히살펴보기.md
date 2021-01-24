@@ -119,14 +119,14 @@ val myRange = spark.range(1000).toDF("number")
 ### 2.6 DataFrame
 - DataFrame은 가장 대표적인 구조적 API
 - DataFrame은 테이블의 데이터를 로우와 컬럼으로 단순하게 표현
-- 컬럼과 컬럼의 타임을 정의한 목록을 <b>스키마(schema)</b> 라고 부름
+- 컬럼과 컬럼의 타입을 정의한 목록을 <b>스키마(schema)</b> 라고 부름
 - DataFrame을 스프레드시트와 비교할 수 있는데, 스프레드시트는 한 대의 컴퓨터에 있지만,  
   Spark DataFrame은 수천 대의 컴퓨터에 분산되어 있음  
 - 여러 컴퓨터에 분산하는 이유는 데이터가 너무 크거나, 계산에 오랜 시간이 걸릴 수 있기 때문
 - python과 R도 마찬가지로 DataFrame의 개념이 있지만, 단일 컴퓨터에 존재(일반적)
 - 이런 상황에서는 DataFrame으로 수행할 수 있는 작업이 해당 머신이 가진 자원에 따라 제한될 수 밖에 없음
 - Spark은 pandas의 DataFrame과 R의 DataFrame을 spark DataFrame으로 쉽게 변환 가능
-- Spark은 Dataset, DataFrame, SQL 테이블, SDD라는 몇 가지 핵심 추상화 개념을 가지고 있음  
+- Spark은 Dataset, DataFrame, SQL 테이블, RDD라는 몇 가지 핵심 추상화 개념을 가지고 있음  
   이 개념 모두 분산 데이터 모음을 표현  
 
 ### 2.6.1 파티션
@@ -293,7 +293,7 @@ fileData2015.sort("count").take(2)
   둘 사이의 성능 차이는 없음
 
 #### 1. DataFrame --> Table로 변환
-- createOrReplaceTempView 메서드 호출로 Table 생성
+- `createOrReplaceTempView` 메서드 호출로 Table 생성
 - 해당 명령어 수행 후 SQL로 데이터 조회 가능
 
 ~~~scala
@@ -358,7 +358,7 @@ flightData2015
 .limit(5)
 .show()
 ~~~
-- DataFrame의 explain()을 통해 확인해보면 총 7가지 단계가 있음
+- DataFrame의 `explain()`을 통해 확인해보면 총 7가지 단계가 있음
 - 실행 계획은 트랜스포메이션의 지향성 비순환 그래프(directed acyclic graph, DAG)이며,  
   액션이 호출되면 결과 생성
 - DAG의 각 단계는 불변성을 가진 신규 DataFrame을 생성함
@@ -374,6 +374,18 @@ flightData2015
   - 브라우저 혹은 구동 엔진에 내장되어 있는 객체를 말한다
 - 데이터소스(DataSource)
   - DB와 Connection을 맺을 때, ConnectionPool에는 여러 Connection 객체가 존재  
-    이때 각각 Application에서 직접적으로 이용하면 체계적인 관리가 어렵게 되므로,   
-    DataSource라는 객체는 Connection Pool을 관리하는 목적으로 사용되는 객체
-  
+    이때 각각 Application에서 직접적으로 이용하면 체계적인 관리가 어렵게 되므로, DataSource라는 개념을 도입하여 사용하고 있음
+    DataSource라는 객체는 Connection Pool을 관리하는 목적으로 사용되는 객체  
+    서버로부터 데이터베이스에 대해 연결을 구축하기 위해 사용되는 이름
+- 프로세스(process)
+  - 실행중에 있는 프로그램
+  - 스케줄링의 대상이 되는 작업(task)과 같은 의미로 쓰임
+  - 프로세스 내부에는 최소 하나의 스레드로 구성. 실제로는 스레드 단위로 스케줄링을 함
+  - 하드디스크에 있는 프로그램을 실행하면 실행을 위해 메모리 할당이 이루어지고 할당된 메모리 공간으로  
+    바이너리 코드가 올라가게 됨. 이 순간부터 프로세스라 불림
+- 세션(Session)
+  - 일정 시간동안 같은 사용자로부터 들어오는 일련의 요구를 하나의 상태로 보고  
+   그 상태를 일정하게 유지시키는 기술
+  - 여기서 말하는 일정 시간은 사용자가 웹 브라우저를 통해 웹 서버에 접속한 시점으로부터 웹 브라우저를 종료함으로써 연결을 끝내는 시점 
+- 술어(predicate)
+  - true / false를 판단할 수 있는 식이나 boolean 값을 리턴하는 함수를 술어(predicate)라고 함

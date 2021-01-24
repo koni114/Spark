@@ -77,7 +77,7 @@ val flights = flightDF.as[Flight]
 // -4 filter, map 함수 적용
 flights
 .filter(flight_row => flight_row.ORIGIN_COUNTRY_NAME != "Canada")
-.map(flight_ row => flight_row)
+.map(flight_row => flight_row)
 .take(5)
 ~~~
 - Dataset의 장점은 collect 메소드나 take 메소드를 사용하면 DataFrame을 구성하는 Row 타입의 객체가 아닌, Dataset에 매개변수로 지정한 타입의 객체를 반환함  

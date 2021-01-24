@@ -46,6 +46,7 @@ Apache Spark를 설명하는 <b>빅데이터를 위한 통합 컴퓨팅 엔진�
 
 #### 컴퓨팅 엔진
 - Spark은 통합이라는 관점을 중시하면서 기능의 범위를 컴퓨팅 엔진으로 제한  
+  (보통 컴퓨팅이라함은, 계산을 의미함)
   그 결과 <b> Spark은 저장소 시스템의 연산하는 역할만 수행, 영구 저장소 역할은 수행하지 않음</b>  
 - 대신 cloud 기반 에저 스토리지, 아마존 S3, Apache Hadoop,  
   key/value형식인 Apache Cassandra, 메세지 전달 서비스인 Apache kafka 등의 저장소를 지원 
