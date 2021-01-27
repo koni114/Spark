@@ -117,6 +117,18 @@
   -  `coalesce` : 전체 데이터를 셔플하지 않고 데이터를 병합하는 경우 사용. 파티션 수를 줄일 때 사용
 - 드라이버로 데이터를 모으려면 `collect`, `toLocalIterator`, `take` 등을 사용. 이때 너무 큰 데이터를 모으는 경우, 비정상적으로 종료될 수 있음
 
+## chapter06
+- `lit` 함수는 다양한 언어의 타입을 Spark 데이터 타입으로 변환해줌 : `df.select(lit(5.0), lit(true))`
+- filtering function --> `===`, `equalTo`
+- 만약 더 쉽다면 `expr` 를 이용한 spark SQL 표현식을 사용해도 성능 상의 이슈는 없음
+- boolean 표현식을 만들 때 null 값은 다르게 처리 해야 함(ex) null-safe 동치 테스트 수행)
+- 값에 null이 포함되어 있는 경우, `eqNullSafe` 함수 사용 가능
+- 수치형 함수 : `pow`, `round`, `bound`, `describe`, `count`, `mean`, `stddev_pop`, `min`, `max`
+- `StatFunctions` 메서드는 다양한 통계값을 제공, ex) `approxQuantile` 데이터의 백분위를 근사값을 제공
+- `monotonically_increasing_id` : 모든 행에 고유 ID 부여
+- 문자열 함수 : `initcap` : 공백으로 나뉘는 글자의 첫글자를 대문자로 변경
+- `lower`, `upper`, `lpad`, `rpad`, `lstrip`, `rstrip`, `strip`  
+
 ## chapter15
 - driver는 cluster에서 실행 중인 application 상태를 유지(SparkSession..?)
 - driver는 spark application을 제어, cluster 상태 정보 유지
