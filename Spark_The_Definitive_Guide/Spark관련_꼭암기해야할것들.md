@@ -128,6 +128,60 @@
 - `monotonically_increasing_id` : 모든 행에 고유 ID 부여
 - 문자열 함수 : `initcap` : 공백으로 나뉘는 글자의 첫글자를 대문자로 변경
 - `lower`, `upper`, `lpad`, `rpad`, `lstrip`, `rstrip`, `strip`  
+- `regexp_extract`, `regex_replace`, `translate`: char 한개씩 replace `translate(col("Description"), "LEET", "1337")`
+- `contains` : 해당 문자 포함 여부
+- 해당 구문은 좀 기억해 두자 : `.map(tmp => {col("colName").contains(tmp).alias(s"is_$color")}):+expr("*")`
+- 날짜형 함수 : 날짜형은 크게 2가지만 관리 -->  달력 형태의 날짜(date), 날짜와 시간 형태를 모두 가지는 timestamp
+- Spark는 특정 날짜 포멧을 지정하지 않아도 자체적으로 판단해 날짜형을 지정 가능
+- `current_date`, `current_timestamp` : 오늘 날짜의 date와 timestamp 함수 사용
+- `date_sub`, `date_add` : 해당 날짜형 컬럼을 기준으로 +, - 하는 함수
+- `date_diff` : 두 날짜의 차이를 구하는 함수, `months_between` : 두 날짜의 개월 수 차이를 비교
+- Spark는 `to_date` 함수 사용시 변환할 수 없는 날짜이면 null 반환  
+  각각 날짜의 format을 지정하고 싶으면 `to_date("2020-20-11", "yyyy-dd-MM")` 으로 지정
+- `to_timestamp` : 항상 날짜 포맷을 지정해야함
+- 날짜 비교시, 날짜 또는 timestamp, yyyy-MM-dd format의 문자열을 사용  
+- 날짜 비교시, 항상 format을 지정해서 사용하자
+- Spark에서는 빈 문자열이나 대체 값 대신 null value를 사용해야 최적화를 수행할 수 있음  
+  DataFrame의 하위 패키지인 .na를 사용하는 것이 DataFrame에서 null 값을 다루는 기본 방식
+- Spark에서는 null값을 허용하지 않는 컬럼을 선언할 수 있지만 강제성은 없음
+- `coalesce` : 값이 있으면 해당 값을 반환하고, null이면 여러 인수 값 중 첫 번째 인수 값을 반환  
+- `ifnull` : 첫 번째 인수 값이 null이면, 두 번째 인수 값 반환
+- `nullif` : 두 값이 같으면 null 반환, 두 값이 다르면 첫번 째값 반환
+- `nvl` : 첫 번째 값이 null이면 두 번째 값 반환, 첫 번째 값이 null이 아니면, 첫 번째 값 반환
+- `nvl2` : 첫 번째 값이 null이 아니면 두 번째 값 반환, 첫 번째 값이 null이면 세 번째 인수로 저장된 값 반환
+- `na.drop`: null값을 가진 로우를 제거하는 가장 간단한 함수    
+  `na.drop("any")` : any 지정시 로우 값 중 하나라도 null값 포함시 row 제거
+- `na.fill("채워 넣을 값", "컬럼")` : null값을 채워 넣기 위한 함수
+- `replace("Description", Map("" - ""))` : 대체할 값과 대체될 값의 타입이 같아야 함   
+- `asc_nulls_first` : 오름차순 정렬시 null 값을 first, `desc_nulls_first` : 내림차순 정렬시 null 값 first  
+  `asc_nulls_last` : 오름차순 정렬시 null 값 last, `desc_nulls_first` : 내림차순 정렬시 null 값 last
+- 복합 데이터 타입 : `struct, ()`로 복합 데이터 타입 생성, 복합 데이터 타입 내 스칼라 값 추출시 `complex`, `getField` 함수 사용
+- `.*` 문자로 모든 값 조회 가능하며, 해당 컬럼 값을 최상위 수준으로 끌어올릴 수 있음 : `complexDF.select("complex.*")`
+- 배열 : `split` : 문자열을 배열로 쪼갬, `size` : 배열의 길이, `array_contains` : 배열에 특정 값이 존재하는지 확인  
+  `explode` : 배열 값을 입력 받아 입력된 컬럼의 모든 값을 row로 만들어 버림
+~~~
+"Hello World", "other col" (split 함수 적용) --> ["Hello", "World"], "other col"
+  (explode 함수 적용) --> "Hello", "other col"
+                          "World", "other col"
+~~~
+- `map` : 컬럼의 키-값 쌍을 이용해 생성. 적합한 key를 이용해 데이터를 조회할 수 있음(`complex_map["keyName"]`)  
+  map의 타입을 `explode` 함수를 이용해서 컬럼으로 만들 수 있음
+- JSON 타입 : `get_json_object` 함수로 JSON 객체를 인라인 쿼리로 조회 가능.   
+  `to_json` : StructType 을 JSON으로 변경 가능  
+  `from_json` : JSON 문자열을 StructType으로 변경 가능 
+- Spark는 드라이버에서 UDF를 직렬화하고, 네트워크를 통해 모든 익스큐터 프로세스를 전달
+- python UDF 사용시 Spark는 워커 노드에 파이썬 프로세스를 실행하고, 파이썬이 이해할 수 있는 포맷으로 데이터를 직렬화함  
+  파이썬 프로세스에 있는 데이터의 로우마다 함수를 실행하고 JVM과 Spark에 처리 결과를 반환 
+- 파이썬 실행시 문제점
+  - 데이터를 직렬화하는 데 큰 부하가 발생
+  - 데이터가 파이썬으로 전달되면 Spark에서 워커 메모리를 관리 할 수 없음  
+    따라서 파이썬과 Spark가 동일한 머신에서 실행되면 메모리 경합을 해 자원에 제약이 생겨 비정상적으로 종료될 수 있음  
+    따라서 java나 Scala로 UDF를 만드는 것이 좋음
+- `udf` 를 사용하면 dataFrame의 함수로 사용 가능  
+  `spark.udf.register("power3", power3(_:Double):Double)` 를 사용하면 `expr` 내에서 사용 가능
+- Spark는 자체 데이터 타입을 사용하기 때문에 UDF 정의시 반환 타입을 지정하는 것이 좋음   
+  반환되는 타입과 실제 데이터 타입과 매칭되지 않으면 Spark는 null값을 발생시킴
+
 
 ## chapter15
 - driver는 cluster에서 실행 중인 application 상태를 유지(SparkSession..?)

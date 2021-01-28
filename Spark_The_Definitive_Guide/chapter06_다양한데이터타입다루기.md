@@ -484,8 +484,8 @@ df.na.replace("Description", Map("" -> "UNKNOWN"))
 - 구조체는 DataFrame 내부의 DataFrame으로 생각할 수 있음
 - 쿼리문에서 다수의 컬럼을 괄호로 묶어 구조체를 만들 수 있음
 ~~~scala
-df.selectExpr("(Description, InvoiceNo) as complex", "\*")
-df.selectExpr("struct(Description, InvoiceNo) as complex", "\*")
+df.selectExpr("(Description, InvoiceNo) as complex", "*")
+df.selectExpr("struct(Description, InvoiceNo) as complex", "*")
 
 import org.apache.spark.sql.functions.struct
 val complexDF = df.select(struct("Description", "InvoiceNo").alias("complex"))
@@ -735,4 +735,5 @@ udfExampleDF.selectExpr("power3py(num)").show(2)
 
 
 ### 용어 정리
-- 인라인 쿼리
+- 인라인 뷰(inline View)
+  - `FROM (SELECT ..)`  : SELECT 절의 결과를 FROM 절에서 하나의 테이블처럼 만들고 싶을 때 사용
