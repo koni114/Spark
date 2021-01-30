@@ -180,7 +180,49 @@
 - `udf` 를 사용하면 dataFrame의 함수로 사용 가능  
   `spark.udf.register("power3", power3(_:Double):Double)` 를 사용하면 `expr` 내에서 사용 가능
 - Spark는 자체 데이터 타입을 사용하기 때문에 UDF 정의시 반환 타입을 지정하는 것이 좋음   
-  반환되는 타입과 실제 데이터 타입과 매칭되지 않으면 Spark는 null값을 발생시킴
+  반환되는 타입과 실제 데이터 타입과 매칭되지 않으면 Spark는 null값을 발생시킴  
+  Spark 함수가 전부 다 되는 것은 아님 
+
+
+
+
+## chapter09
+- JSON(JavaScropt Object Notation)
+- 파케이는 컬럼에 복합 데이터 구조도 가능
+- ORC는 하둡 워크로드를 위해 설계된 self-decribing 구조이며, 데이터 타입을 인식할 수 있는 컬럼 기반 데이터 타입 포맷
+- DB에서 데이터를 읽고 쓰려면 jar파일의 JDBC 드라이버가 존재해야 함
+- dbTable에 단일 테이블 대신에 서브쿼리도 사용 가능
+- <b> Query pushDown </b> : DataFrame에서 트랜스포메이션을 수행하기 전에 쿼리에서 해당 트랜스포메이션(ex) filtering)을 수행할 수 있음  
+  DataFrame의 filter 함수를 Spark는 DB query로 자체 위임해 최적화하는 기능이 있음
+- DB에서 `numPartition` 수를 지정하여 최대 파티션 수를 지정할 수 있음
+- 병렬로 데이터를 읽고 쓰는 것이 최적화에 효율적인데, 일반적으로 데이터 포맷은 파케이, 압축 방식은 GZIP이 효율적임
+- 읽을 때는 하나의 익스큐터에서 하나의 파티션(file)을 읽을 수 있으며, 쓸 때는 파티션 하나당 하나의 파일이 생성됨
+- 파티셔닝(partitioning)  
+  - 데이터를 어디서, 어떻게 저장 하는지를 제어하는 기능. 
+    ex) 디렉토리 별로 컬럼 데이터를 저장할 수 있음 --> 데이터를 전부 읽어보지 않고 특정 컬럼의 데이터를 가져올 수 있음  
+    ex) 날짜별로 디렉토리에 저장하여(날짜를 partition parameter로 지정) 과거 날짜의 데이터를 가져오는 등을 수행할 수 있음
+- 버켓팅(bucketing)
+  - 버켓팅을 수행하게 되면 파티션 별로 동일한 버켓ID가 부여되여 저장되며, 이를 다시 읽을 때 셔플이 일어나지 않음
+- 너무 작은 파일을 여러개 만들면 메타 데이터의 부하가 발생하여 Spark는 이를 잘 다루지 못함  
+  너무 큰 데이터도 마찬가지로 메모리 상에 부하가 발생할 수 있음
+- JDBC(Java DataBase Connectivity)  
+  - Java에서 DB 프로그래밍을 하기 위한 API. Database 모듈에 상관이 없음
+- JDBC 드라이버  
+  - Java Class로써 DBMS와의 통신을 담당함
+- ORC(Optimized Row Columnar)
+  - 컬럼 기반의 파일 저장방식 
+  - Hadoop, Hive, Pig, Spark에 적용 가능
+  - ORC는 컬럼 단위로 데이터를 저장하기 때문에 압축 효율이 좋고, 성능이 빠름
+- 이스케이프 처리  
+  - 특수 문자 앞에 `\`를 붙여 특수 문자를 정상 문자로 처리하고 싶을 때 이스케이프 처리를 한다고 함
+- 트랜젝션 격리 수준(transaction isolation level)
+  - read uncommited : commit 되지 않아도 table의 데이터가 수정되면 수정된 값이 그대로 반영 
+  - read commited   : commit된 정보만 table에 반영되어 나타남
+  - repeatable read : 트랜잭션이 시작되기 전 정보 이후의 갱신된 데이터는 나타나지 않음
+  - serializable    : 트랜잭션이 시작되면 읽기 작업에도 잠금이 설정되어 다른 작업 수행시 해당 table에 접근하지 못함
+- TRUNCATE : DELETE 명령어와 같이 특정 Table의 레코드를 삭제하는 역할을 함  
+  - DELETE와는 달리 Table DROP 후 CREATE
+  - 속도는 TRUNCATE가 더 빠르지만 복구가 불가
 
 
 ## chapter15
@@ -281,7 +323,7 @@
 - 페어 스케줄러(Fair Scheduler)는 제출된 작업이 동등하게 수행될 수 있도록 지원  
   페어 스케줄러 사용시 pool의 그룹화를 수행할 수 있게되고, 그룹별로 자원 할당의 가중치 부여가 가능 
 - 컴파일은 빌드의 부분집합이라 할 수 있음
-- 
+
 
 ## Methods, function 
 - `spark.sql` : SQL 쿼리 실행
