@@ -1530,6 +1530,16 @@ scala> println(list)
 List(Person(2,4), Person(3,4), Person(1,3))
 ~~~
 
+## lazy val
+- 지연 변수로써 선언되는 순간에 변수에 RHS를 계산해서 LHS로 할당하는 것이 아니라  
+  호출되는 시점에 계산함
+
+## Option class
+- `Option` 클래스는 어떤 값이 있을 수도, 없을 수도 있는 상황에 쓸 수 있는 간단한 형태의 컨테이너 클래스
+- 해당 클래스는 abstract class 이므로 인스턴스를 만들 수 없고 코드에서는 이 클래스의 하위 클래스인 `Some`이나 `None`을 사용
+- 
+
+
 ## 용어 정리
 - trait
   - Scala 는 interface 가 없으며 대신  trait 을 사용한다.
