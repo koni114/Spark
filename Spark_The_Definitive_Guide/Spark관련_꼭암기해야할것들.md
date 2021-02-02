@@ -222,7 +222,7 @@
   - serializable    : 트랜잭션이 시작되면 읽기 작업에도 잠금이 설정되어 다른 작업 수행시 해당 table에 접근하지 못함
 - TRUNCATE : DELETE 명령어와 같이 특정 Table의 레코드를 삭제하는 역할을 함  
   - DELETE와는 달리 Table DROP 후 CREATE
-  - 속도는 TRUNCATE가 더 빠르지만 복구가 불가
+  - 속도는 TRUNCATE가 더 빠르지만 복구가 불가함
 
 
 ## chapter15
@@ -288,7 +288,7 @@
 - Spark 런타임에서 파이프라이닝을 자동으로 수행해줌
 - reduce-by-key 같은 연산 수행시 소스 태스크의 스테이지 수행 동안 셔플 파일을 디스크에 기록  
   저장된 셔플 파일은 재사용됨(뒷단의 연산은 재수행되지 않음)
-- 이러한 자동 최적화 기능은 워크로드의 시간 최적화에 도움이 됨
+- 이러한 자동 최적화 기능은 워크로드의 시간 최적화에 도움이 됨  
 
 ## chapter 16
 - Spark application은 빌드 도구로 apache maven이나 sbt를 사용할 수 있음
