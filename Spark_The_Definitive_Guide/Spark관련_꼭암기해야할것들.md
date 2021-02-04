@@ -208,7 +208,7 @@
 - JDBC(Java DataBase Connectivity)  
   - Java에서 DB 프로그래밍을 하기 위한 API. Database 모듈에 상관이 없음
 - JDBC 드라이버  
-  - Java Class로써 DBMS와의 통신을 담당함
+  - Java Class로써 DBMS와의 통신을 담당
 - ORC(Optimized Row Columnar)
   - 컬럼 기반의 파일 저장방식 
   - Hadoop, Hive, Pig, Spark에 적용 가능
