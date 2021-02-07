@@ -1,6 +1,6 @@
 # ant로 build하기
 - ant는 기본적으로 eclipse에 탑재가 되어 있음  
-  만약 없다면 ant를 다운로드 받아 설치
+  만약 없다면 ant를 다운로드 받아 설치하자
 
 ## build.xml file 확인
 - `build.xml` 파일을 작성하기 전, `build.properties` file에 원하는 property 정보를 다음과 같이 입력할 수 있습니다.
