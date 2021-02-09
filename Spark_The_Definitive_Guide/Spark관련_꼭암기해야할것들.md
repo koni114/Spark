@@ -183,8 +183,131 @@
   반환되는 타입과 실제 데이터 타입과 매칭되지 않으면 Spark는 null값을 발생시킴  
   Spark 함수가 전부 다 되는 것은 아님 
 
+## chapter07
+- Spark는 수행 가능한 정확도에 맞춰 근사치를 계산하여 성능을 높일 수 있음  
+- `count()` 메소드는 데이터의 수를 세는 용도 뿐만 아니라 dataFrame을 캐싱하는데 사용
+- 집계 함수는 `org.apache.spark.sql.functions` 에서 찾아볼 수 있음
+- `count`
+  - count 함수는 트랜스포메이션과 액션 두 가지 방식으로 사용 가능
+  - `count("colName")`은 트랜스포메이션 방식, 컬럼명이 들어가면 null을 제거하고 count,  
+    `*`가 들어가면 null 포함 count
+- `countDistinct` 
+  - distinct된 data count
+- `approx_count_distinct` 
+  - countdistinct의 근사치 계산. 최대 추정 오류율이라는 parameter 있음
+- `first`, `last` 
+  - 첫 번째와 마지막 값을 얻을 때 사용
+- `min`, `max`, `sum`, `sumDistinct`, `avg`
+- `variance`, `stddev`
+  - 표본표준편차, 표본분산값 계산
+- `var_pop`, `stddev_pop`
+  - 모표준편차, 모분산값 계산
+- 모표준편차와 표본표준편차의 차이는 분모에 N으로 나누느냐, N-1로 나누느냐의 차이
+- `skewness`, `kurtosis`
+ - 비대칭도(skewness), 첨도(kurtosis)를 계산
+- `corr`, `covar_pop`, `covar_samp`
+  - 상관계수, 모공분산, 모표본분산
+- Spark은 특정 컬럼을 복합 데이터 타입으로 처리 할 수 있음  
+  예를 들어 리스트나 Set Data Collection Type으로 처리 가능
+- 다음과 같은 구문을 사용할 수 있음을 기억하자
+~~~scala
+// agg 함수를 사용하여 집계 가능
+df.groupby("colName").agg(
+  count("colName").alias("name"),
+  expr("count(Colname)")).show()
 
+// Map을 이용한 그룹화
+df.groupby("colName").agg("colName1" -> "avg", "colName2" -> "stddev_pop")
+~~~
+- Spark는 3가지 윈도우 집계 함수 지원 --> rank, analytic, aggregate
+- 다음의 예제를 눈에 익게 해두자
+~~~scala
+import org.apache.spark.sql.expressions.Window
+import org.apache.spark.sql.functions.{col, to_date}
+import org.apache.spark.sql.functions.max
 
+val dfWithDate = df.withColumn("date", to_date(col("InvoiceDate"), "MM/d/yyyy H:mm"))
+dfWithDate.createOrReplaceTempView("dfWithDate")
+
+val windowSpec = Window
+.partitionBy("CustomerId", "date") // 파티셔닝 스키마 X, 그룹을 어떻게 나눌지 결정하는 것
+.orderBy(col("Quantity").desc)     // 파티션의 정렬 방식을 정의함
+.rowsBetween(Window.unboundedPreceding, Window.currentRow)
+
+val maxPurchaseQuantity = max(col("Quantity")).over(windowSpec)
+val purchaseDenseRank = dense_rank().over(windowSpec)
+val purchaseRank = rank().over(windowSpec)
+
+dfWithDate.where("CustomerId IS NOT NULL").orderBy("CustomerId")
+.select(
+  col("CustomerId"),
+  col("date"),
+  col("Quantity"),
+  purchaseRank.alias("quantityRank"),
+  purchaseDenseRank.alias("purchaseDenseRank"),
+  maxPurchaseQuantity.alias("maxPurchaseQuantity")).show()
+~~~
+- sql 에서는 `GROUPING SETS`, dataFrame에서 `rollup` 과 `cube` 함수 사용
+- `rollup` -> 그룹화 키로 설정된 조합 + 데이터셋에서 볼 수 있는 실제 조합을 모두 볼 수 있음  
+  ex) 그룹화를 날짜, 국가로 지정했을 때 날짜의 총합, 날짜별 총합, 날짜별 국가별 총합 확인 가능
+~~~scala
+val rolledUpDF = dfNoNull.rollup("Date", "Country").agg(sum("Quantity"))
+.selectExpr("Date", "Country", "`sum(Quantity)` as total_Quantity")
+.orderBy("Date")
+rolledUpDF.show()
+~~~
+- `cube` -> rollup을 조금 더 고차원적으로 확인  
+  Date와 Country를 그룹으로 지정했을 때, `groupby("Date", "Country")` + `groupby("Date")` + `groupby("Country")` 의 결과가 나온다고 생각하면 이해하기 쉬움
+- 큐브와 롤업의 집계 수준 조회시 `grouping_id` 사용
+- 그룹화 id의 수가 높아질수록 groupby를 무시한 총량 계산 한다고 생각하자 
+- `pivot`
+  - 로우를 컬럼으로 변환
+~~~scala
+val pivoted = dfWithDate.groupBy("date").pivot("Country").sum()
+pivoted.where("date > '2011-12-05'").select("date", "`USA_sum(Quantity)`").show()
+~~~
+- Spark는 입력 데이터의 중간 결과를 단일 AggregationBuffer에 저장해 관리  
+  
+## chapter08
+- Spark 조인 타입
+  - 내부 조인(inner join), 외부 조인(outer join), 왼쪽 외부 조인(left outer join), 오른쪽 외부 조인(right outer join)
+  - 왼쪽 세미 조인(left semi join) : 키가 일치하는 경우에 키가 일치하는 왼쪽 데이터셋만 유지
+  - 왼쪽 안티 조인(left anti join) : 키가 일치하지 않는 경우에는 키가 일치하지 않는 왼쪽 데이터셋만 유지
+  - 자연 조인(natural join) : 두 데이터셋에서 동일한 이름을 가진 컬럼을 암시적으로 결합하는 조인을 수행
+  - 교차 조인(cross join) 또는 카테시안 조인(Cartesian join) : 왼쪽 데이터셋의 모든 로우와 오른쪽 데이터셋의 모든 로우를 조합
+- 조인 예시 코드
+~~~scala
+// val joinType = "outer", "inner", "left_outer", "right_outer", "left_semi", "left_anti"
+val joinExpression = person.col("graduate_program") === graduateProgram.col("id")
+person.join(graduateProgram, joinExpression, joinType).show()
+~~~
+- dataFrame의 컬럼은 카탈리스트 엔진에 고유 Id가 있음  
+  카탈리스트 엔진에 있는 고유 id는 직접 참조할 수 있는 값은 아님.
+- Spark의 조인 수행 방식을 이해하기 위해서는 핵심적인 두 가지 핵심 전략을 이해해야 함
+  - 노드간 네트워크 통신 전략과 노드별 연산 전략
+- 네트워크 통신 전략 
+  - Spark는 조인시 두 가지 클러스터 통신방식 활용
+  - 전체 노드간의 통신을 유발하는 셔플 조인과 통신을 유발하지 않는 브로드케스트 조인 방식이 있음
+- 셔플 조인
+  - 두 개의 큰 데이터를 조인할 때 적용되는 조인 방식
+  - 전체 노드간 통신이 발생. 
+  - 특정 키나 키 집합을 어떤 노드에서 가지고 있느냐에 따라 해당 노드와 데이터를 공유
+  - 통신 방식 때문에 네트워크는 복잡해지고 많은 자원을 사용 
+- 브로드캐스트 조인
+  - 테이블이 단일 워커 노드의 메모리 하나에 로딩이 가능할 정도로 작은 경우 수행
+  - 작은 DataFrame을 전체 워커 노드에 복제함. 이렇게 하면 자원을 많이 사용하는 것처럼 보이지만  
+    전체 노드의 네트워크가 일어나지 않으므로 자원을 아낄 수 있음  
+    데이터를 복제할 때 한 번만 네트워크가 수행되고, 뒤에는 노드간 네트워크가 수행되지 않음
+  - 모든 단일 노드에서 개별적으로 조인이 수행되므로, CPU가 가장 큰 병목 구간이 됨
+  - `explain` 함수를 사용하면 조인시 어떤 네트워크  통신 전략을 사용했는지 확인 가능 
+- DataFrame API를 사용하면 조인시 hint를 줄 수 있음
+~~~
+person.join(broadcast(graduateProgram), joinExpr).explain()
+~~~
+- SQL 역시 조인 수행에 필요한 힌트를 줄 수 있음
+- 너무 큰 데이터를 브로드케스트 하면 메모리 상에 해당 데이터를 다 로딩할 수 없어 driver process가 강제 종료될 수 있음
+- 아주 작은 테이블 끼리의 조인은 spark가 자동으로 처리하도록 두는 것이 좋음
+- 조인 전에 데이터를 적절히 분할하면 셔플이 계획되어 있더라도 피할 수 있고 효율적으로 실행 가능
 
 ## chapter09
 - JSON(JavaScropt Object Notation)
@@ -323,6 +446,45 @@
 - 페어 스케줄러(Fair Scheduler)는 제출된 작업이 동등하게 수행될 수 있도록 지원  
   페어 스케줄러 사용시 pool의 그룹화를 수행할 수 있게되고, 그룹별로 자원 할당의 가중치 부여가 가능 
 - 컴파일은 빌드의 부분집합이라 할 수 있음
+
+## chapter 17
+- Spark 애플리케이션 실행을 위한 클러스터 환경은 크게 두 가지로 나눌 수 있음
+  - on-premise 환경
+  - public cloud 환경
+- on-premise cluster 환경은 자체 데이터 센터가 구축되어 있는 경우 적합함  
+- on-premise cluster 구축시 사용 중인 하드웨어를 완전히 제어할 수 있으므로 특정 워크로드의 성능 최적화가 가능
+- 하지만 Spark 같은 데이터 분석 워크로드에서는 on-premise 환경이 몇 가지 문제를 발생시킬 수 있음
+- on premise cluster의 크기는 제한적
+- 클러스터의 크기가 너무 작으면 신규 ML 모델을 학습하는 Job을 실행시키기 어렵고, 너무 크면 남용 자원이 많아짐
+- on-premise cluster는 HDFS나 분산 키-값 저장소 같은 자체 저장소 시스템을 선택하고 운영해야함  
+  상황에 따라 geo-replication 및  disaster recovery 체계도 함께 구축해야 함
+- on-premise cluster 사용시 자원 활용 문제를 해결할 수 있는 가장 좋은 방법은 클러스터 매니저 사용
+- 클러스터 매니저를 사용하면 다수의 Spark application을 사용할 수 있고, 자원을 동적으로 할당이 가능
+- Spark가 지원하는 클러스터 매니저는 Spark 어플리케이션 뿐만 아니라 동시에 다른 여러 어플리케이션을 실행할 수 있음
+- 자원 공유적인 측면에서 on-premise / public cloud는 큰 자이가 있는데, on-premise는 여러 종류의 저장소를 내가 스스로 선택이 가능하고,  
+  public cloud는 애플리케이션 크기에 맞는 규모의 클러스터 얻을 수 있음
+- 클라우드 환경에서 빅데이터 워크로드를 실행하면 얻을 수 있는 장점이 존재
+  - 자원을 탄력적이게 늘이고 줄이는 것이 가능
+  - 일반적인 연산을 수행하는 경우에도 애플리케이션마다 다른 유형의 머신과 클러스터 규모를 선택할 수 있어 가격 대비 뛰어난 성능을 얻을 수 있음
+    ex) 딥러닝 작업이 필요한 경우에만 GPU 인스턴스를 할당받아 사용 가능
+  - 많은 클라우드로 전환하려는 기업들은 기존의 클러스터를 운영하는 방식 그대로 가져가려고 하는데, 
+    고정된 크기의 클러스터는 자원의 효율성을 가져가지 못함
+  - 띠리서 Amazon S3, Azure blob, GCS 와 같이 클러스터와 분리된 글로벌 저장소 시스템을 사용하고  
+    Spark 워크로드마다 별도의 클러스터를 동적으로 할당하는 것이 좋음
+- 연산 클러스터와 저장소 클러스터를 분리하면 연산이 필요한 경우에만 클러스터 비용을 지불하면 됨
+- 동적으로 크기 조절이 가능하며 하드웨어 종류가 다른 것들을 섞어서 사용도 가능함
+- 클라우드 환경에서는 연산 관련 프로그램 및 환경을 관리할 필요가 없음  
+- stand-alone 클러스터 매니저는 Spark workload용으로 특별히 제작된 경량화 플랫폼
+- stand-alone은 spark application만 실행할 수 있음
+- YARN은 Job 스케줄링과 클러스터 자원 관리용 프레임워크
+- Spark은 하둡 에코시스템의 일부로 착각해 잘못 분류하는 경우가 많은데, Spark은 하둡과 거의 관련이 없음 
+- `spark-submit` 명령의 `--master` 인수를 yarn으로 지정해 하둡 YARN 클러스터에서 Spark Job 실행 가능
+- YARN 클러스터와 다른 배포 환경과의 가장 큰 차이점은 `--master` 인수 값을 `yarn`으로 지정한다는 것
+- `HADOOP_CONF_DIR`과 `YARN_CONF_DIR` 환경변수를 통해 YARN 설정 파일을 찾아냄  
+  이 환경변수를 하둡의 환경 설정 디렉터리 경로에 설정하면 `spark-sumbit` 명령 실행 가능
+- YARN에서는 두 가지 배포 모드로 spark application 실행 가능
+  - cluster 모드 : YARN 클러스터에서 Spark 드라이버 프로세스를 관리하며 클라이언트는 애플리케이션을 생성한 즉시 종료
+  - client 모드 : 드라이버가 클라이언트 프로세스에서 실행되고 YARN은 마스터 노드를 관리하지 않으며 application의 익스큐터 자원을 배분하는 역할을 함
 
 
 ## Methods, function 
