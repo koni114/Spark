@@ -461,7 +461,7 @@ person.join(broadcast(graduateProgram), joinExpr).explain()
 - on-premise cluster 사용시 자원 활용 문제를 해결할 수 있는 가장 좋은 방법은 클러스터 매니저 사용
 - 클러스터 매니저를 사용하면 다수의 Spark application을 사용할 수 있고, 자원을 동적으로 할당이 가능
 - Spark가 지원하는 클러스터 매니저는 Spark 어플리케이션 뿐만 아니라 동시에 다른 여러 어플리케이션을 실행할 수 있음
-- 자원 공유적인 측면에서 on-premise / public cloud는 큰 자이가 있는데, on-premise는 여러 종류의 저장소를 내가 스스로 선택이 가능하고,  
+- 자원 공유적인 측면에서 on-premise / public cloud는 큰 자이가 있는데, on-premise는 여러 종류의 저장소를 내가 스스로 선택이 가능하고
   public cloud는 애플리케이션 크기에 맞는 규모의 클러스터 얻을 수 있음
 - 클라우드 환경에서 빅데이터 워크로드를 실행하면 얻을 수 있는 장점이 존재
   - 자원을 탄력적이게 늘이고 줄이는 것이 가능
